@@ -13,11 +13,14 @@ namespace CommanderX16
         private readonly SettingsStore store;
         private readonly ComboBox releases = Combo();
         private readonly TextBox parent = Entry(), folderName = Entry();
-        private readonly Label destination = new Label { AutoSize = true };
+        private readonly TextBox destination = new TextBox { ReadOnly = true, Dock = DockStyle.Fill };
+        private readonly CheckBox overwrite = new CheckBox { Text = "Overwrite existing installation", AutoSize = true };
+        private readonly ProgressBar activity = new ProgressBar { Dock = DockStyle.Fill, Style = ProgressBarStyle.Marquee, Visible = false };
         private readonly Label status = new Label { AutoSize = true, MaximumSize = new Size(600, 0) };
         private readonly Button install = Button("Install"), refresh = Button("Check for versions");
         private readonly TableLayoutPanel body = Table();
         private bool busy;
+        private string overwritePath;
         public string EmulatorId { get; private set; }
 
         public InstallForm(SettingsStore store)
@@ -26,12 +29,16 @@ namespace CommanderX16
             Text = "Install or update X16Emu";
             Font = new Font("Segoe UI", 10);
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(680, 284);
-            MinimumSize = new Size(620, 320);
+            ClientSize = new Size(730, 360);
+            MinimumSize = new Size(645, 385);
             StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = false;
             MaximizeBox = false;
             body.Padding = new Padding(14);
+            body.AutoSize = false;
+            body.Dock = DockStyle.Fill;
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            ClientSizeChanged += (sender, args) => status.MaximumSize = new Size(Math.Max(1, ClientSize.Width - body.Padding.Horizontal - 12), 0);
             Controls.Add(body);
             var intro = new Label
             {
@@ -40,13 +47,19 @@ namespace CommanderX16
             };
             AddRow(body, intro);
             AddRow(body, Pair("Windows release", releases, refresh));
-            AddRow(body, Pair("Install parent", parent, Button("Browse…", Browse)));
+            var browse = Button("Browse…", Browse);
+            AddRow(body, Pair("Install parent", parent, browse));
+            parent.EnabledChanged += (sender, args) => browse.Enabled = parent.Enabled;
             AddRow(body, Pair("New folder name", folderName));
             AddRow(body, Pair("Destination", destination));
+            AddRow(body, overwrite);
             AddRow(body, status);
+            AddRow(body, activity);
             var close = Button("Close", Close);
+            refresh.EnabledChanged += (sender, args) => close.Enabled = refresh.Enabled;
             close.DialogResult = DialogResult.Cancel;
             AddRow(body, Flow(install, close));
+            AddRow(body, new Panel(), SizeType.Percent, 100);
             AcceptButton = install;
             CancelButton = close;
 
@@ -55,12 +68,14 @@ namespace CommanderX16
             install.Click += async (sender, args) => await Install();
             releases.SelectedIndexChanged += (sender, args) =>
             {
+                overwrite.Checked = false;
                 var selected = releases.SelectedItem as Release;
                 folderName.Text = selected == null ? "" : DefaultFolder(selected);
                 UpdateDestination();
             };
             parent.TextChanged += (sender, args) => UpdateDestination();
             folderName.TextChanged += (sender, args) => UpdateDestination();
+            overwrite.CheckedChanged += (sender, args) => UpdateDestination();
             Shown += async (sender, args) => await LoadReleases();
             FormClosing += (sender, args) => { if (busy) args.Cancel = true; };
             UpdateDestination();
@@ -89,7 +104,7 @@ namespace CommanderX16
 
         private void UpdateDestination()
         {
-            install.Enabled = false;
+            install.Enabled = overwrite.Enabled = false;
             destination.Text = "";
             if (busy) return;
             var selected = releases.SelectedItem as Release;
@@ -102,9 +117,24 @@ namespace CommanderX16
             {
                 string path = Destination(parent.Text.Trim(), folderName.Text);
                 destination.Text = path;
-                if (Directory.Exists(path) || File.Exists(path))
+                if (!Same(path, overwritePath))
                 {
-                    status.Text = "Destination already exists. Change the folder name or close this dialog and register the existing folder.";
+                    overwritePath = path;
+                    overwrite.Checked = false;
+                }
+                if (File.Exists(path))
+                {
+                    status.Text = "A file already occupies the destination.";
+                    return;
+                }
+                if (Directory.Exists(path))
+                {
+                    EmulatorFolders.CheckDirectory(path, store.Data, RegisteredAt(path));
+                    overwrite.Enabled = true;
+                    status.Text = overwrite.Checked
+                        ? "The previous installation will be kept in a backup folder."
+                        : "Destination already exists. Choose another folder or check Overwrite.";
+                    install.Enabled = overwrite.Checked;
                     return;
                 }
                 var registered = store.Data.Emulators.Where(e => Same(e.Release, selected.Tag) && Same(e.Asset, selected.Asset)).ToList();
@@ -119,7 +149,9 @@ namespace CommanderX16
         private void SetBusy(bool value)
         {
             busy = value;
-            body.Enabled = !value;
+            activity.Visible = value;
+            releases.Enabled = parent.Enabled = folderName.Enabled = refresh.Enabled = !value;
+            install.Enabled = overwrite.Enabled = false;
             if (!value) UpdateDestination();
         }
 
@@ -145,7 +177,7 @@ namespace CommanderX16
                     index = Array.FindIndex(available, r => r.Asset.IndexOf("win32", StringComparison.OrdinalIgnoreCase) >= 0);
                 releases.SelectedIndex = Math.Max(0, index);
             }
-            catch (Exception error) { failure = error.Message; }
+            catch (Exception error) { failure = "Release check failed. " + error.Message; }
             finally
             {
                 SetBusy(false);
@@ -153,40 +185,82 @@ namespace CommanderX16
             }
         }
 
+        private Emulator RegisteredAt(string path) => store.Data.Emulators.FirstOrDefault(build =>
+            Same(path, EmulatorFolders.Root(build)) ||
+            (build.InstallRoot == null && build.Asset != null && EmulatorFolders.Contains(path, build.Exe)));
+
         private async Task Install()
         {
             string writtenExe = null;
+            string backup = null;
+            string target = null;
+            bool recorded = false;
             try
             {
                 var selected = (Release)releases.SelectedItem;
                 string parentPath = Path.GetFullPath(parent.Text.Trim());
                 string path = Destination(parentPath, folderName.Text);
+                target = path;
+                var existing = Directory.Exists(path) ? RegisteredAt(path) : null;
+                bool replace = overwrite.Checked && Directory.Exists(path);
+                if (replace)
+                {
+                    EmulatorFolders.CheckDirectory(path, store.Data, existing);
+                    if (MessageBox.Show(this, "Replace this installation? The old files will be kept in a backup folder." +
+                        Environment.NewLine + path, Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question,
+                        MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+                }
                 SetBusy(true);
-                status.Text = "Downloading and verifying " + selected.Tag + "…";
+                status.Text = "Preparing " + selected.Tag + "…";
                 var result = await PowerShell.Execute(new Request
                 {
-                    Action = "Install", Release = selected, Destination = path
-                });
+                    Action = "Install", Release = selected, Destination = path, Overwrite = replace
+                }, new Progress<string>(step => { if (busy) status.Text = step; }));
+                backup = result.Backup;
                 writtenExe = result.Exe;
                 if (string.IsNullOrEmpty(writtenExe) || !File.Exists(writtenExe))
                     throw new IOException("The installer did not return a usable emulator executable.");
-                var emulator = new Emulator
-                {
-                    Name = folderName.Text, Exe = result.Exe, Release = selected.Tag, Asset = selected.Asset,
-                    UpstreamOptions = true
-                };
+                string id = existing?.Id ?? Guid.NewGuid().ToString("N");
                 store.Save(settings =>
                 {
                     settings.InstallParent = parentPath;
-                    settings.Emulators.Add(emulator);
+                    var emulator = settings.FindEmulator(id);
+                    if (emulator == null)
+                    {
+                        emulator = new Emulator { Id = id, Name = Path.GetFileName(path), UpstreamOptions = true };
+                        settings.Emulators.Add(emulator);
+                    }
+                    emulator.Exe = writtenExe;
+                    emulator.Release = selected.Tag;
+                    emulator.Asset = selected.Asset;
+                    emulator.InstallRoot = path;
                 });
-                EmulatorId = emulator.Id;
+                recorded = true;
+                EmulatorId = id;
+                if (backup != null)
+                    MessageBox.Show(this, "Previous installation saved at:" + Environment.NewLine + backup,
+                        Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
                 DialogResult = DialogResult.OK;
             }
             catch (Exception error)
             {
                 string message = error.Message;
-                if (writtenExe != null)
+                if (backup != null && !recorded)
+                {
+                    string replacement = target + ".replacement-" + Guid.NewGuid().ToString("N").Substring(0, 8);
+                    try
+                    {
+                        Directory.Move(target, replacement);
+                        Directory.Move(backup, target);
+                        message += Environment.NewLine + "The previous installation was restored. Replacement files: " + replacement;
+                    }
+                    catch (Exception restoreError)
+                    {
+                        message += Environment.NewLine + "Could not restore the previous installation from " +
+                            backup + ". " + restoreError.Message;
+                    }
+                }
+                else if (writtenExe != null && !recorded)
                     message += Environment.NewLine + "The files were installed. Register the existing folder at " + Path.GetDirectoryName(writtenExe);
                 MessageBox.Show(this, message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }

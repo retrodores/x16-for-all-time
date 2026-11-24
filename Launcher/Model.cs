@@ -194,6 +194,7 @@ namespace CommanderX16
         [DataMember] public string Exe;
         [DataMember] public string Release;
         [DataMember] public string Asset;
+        [DataMember] public string InstallRoot;
         [DataMember] public bool UpstreamOptions;
         [DataMember] public string Extra;
         [DataMember] public string DefaultRom;
@@ -292,6 +293,7 @@ namespace CommanderX16
         [DataMember] public string WorkingDirectory;
         [DataMember] public Release Release;
         [DataMember] public string Destination;
+        [DataMember] public bool Overwrite;
     }
 
     [DataContract]
@@ -299,6 +301,7 @@ namespace CommanderX16
     {
         [DataMember] public Release[] Releases { get; set; }
         [DataMember] public string Exe { get; set; }
+        [DataMember] public string Backup { get; set; }
     }
 
     internal sealed class SettingsStore : IDisposable

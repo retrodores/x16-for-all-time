@@ -25,7 +25,11 @@ function Get-X16Releases {
     }
 }
 
-function Install-X16Release($Release, [string]$Destination) {
+function Show-Stage([string]$Stage) {
+    [Console]::WriteLine("X16-STAGE:$Stage")
+}
+
+function Install-X16Release($Release, [string]$Destination, [bool]$Overwrite) {
     $uri = [uri]$Release.Url
     if ($uri.Scheme -ne 'https' -or $uri.Host -ne 'github.com' -or
         $uri.AbsolutePath -notmatch '^/X16Community/x16-emulator/releases/download/[^/]+/[^/]+\.zip$') {
@@ -35,16 +39,23 @@ function Install-X16Release($Release, [string]$Destination) {
     $parent = [IO.Directory]::GetParent($destinationPath)
     if ($null -eq $parent) { throw 'Choose a new folder under an install parent.' }
     if (Test-Path -LiteralPath $destinationPath) {
-        throw "The destination already exists. Choose another folder or register its existing x16emu.exe. $destinationPath"
+        $item = Get-Item -LiteralPath $destinationPath -Force
+        if (!$Overwrite -or !$item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            throw "The destination already exists and cannot be replaced. $destinationPath"
+        }
     }
 
     [void][IO.Directory]::CreateDirectory($parent.FullName)
     $stage = Join-Path $parent.FullName ('.x16-install-' + [guid]::NewGuid().ToString('N'))
     [void][IO.Directory]::CreateDirectory($stage)
+    $step = 'Download'
     try {
         $zip = Join-Path $stage 'release.zip'
         $files = Join-Path $stage 'files'
+        Show-Stage "Downloading $($Release.Tag)..."
         Invoke-WebRequest -UseBasicParsing -TimeoutSec 120 -Uri $uri -OutFile $zip
+        $step = 'Checksum verification'
+        Show-Stage "Verifying $($Release.Tag)..."
         if ($Release.Digest) {
             if ($Release.Digest -notmatch '^sha256:([0-9a-f]{64})$') { throw 'GitHub returned an unsupported asset digest.' }
             $expected = $Matches[1]
@@ -52,15 +63,41 @@ function Install-X16Release($Release, [string]$Destination) {
                 throw 'The emulator download did not match the release checksum.'
             }
         }
+        $step = 'ZIP extraction'
+        Show-Stage "Extracting $($Release.Tag)..."
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         [IO.Compression.ZipFile]::ExtractToDirectory($zip, $files)
         $exes = @(Get-ChildItem -LiteralPath $files -Recurse -File -Filter 'x16emu.exe')
         if ($exes.Count -ne 1) { throw 'Expected exactly one x16emu.exe in the release ZIP.' }
         $relativeExe = $exes[0].FullName.Substring($files.Length + 1)
-        # The rename fails if another process has already created the destination.
-        [IO.Directory]::Move($files, $destinationPath)
-        Join-Path $destinationPath $relativeExe
+        $step = 'DLL validation'
+        Show-Stage "Checking emulator files..."
+        if ($Release.Asset -ieq 'x16emu_win32-r49.zip' -and
+            !(Test-Path -LiteralPath (Join-Path $exes[0].DirectoryName 'libgcc_s_dw2-1.dll') -PathType Leaf)) {
+            throw 'R49 Win32 ZIP lacks libgcc_s_dw2-1.dll. Use R49 Win64 on 64-bit Windows or select a different Win32 build.'
+        }
+        $step = 'Installation'
+        Show-Stage "Installing $($Release.Tag)..."
+        $backup = $null
+        if (Test-Path -LiteralPath $destinationPath) {
+            $item = Get-Item -LiteralPath $destinationPath -Force
+            if (!$Overwrite -or !$item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+                throw "The destination already exists and cannot be replaced. $destinationPath"
+            }
+            $backup = $destinationPath + '.previous-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
+            [IO.Directory]::Move($destinationPath, $backup)
+        }
+        try { [IO.Directory]::Move($files, $destinationPath) }
+        catch {
+            if ($backup) {
+                try { [IO.Directory]::Move($backup, $destinationPath) }
+                catch { throw "Could not restore the previous installation from $backup. $($_.Exception.Message)" }
+            }
+            throw
+        }
+        @{ Exe = (Join-Path $destinationPath $relativeExe); Backup = $backup }
     }
+    catch { throw "$step failed. $($_.Exception.Message)" }
     finally {
         Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
     }
@@ -70,7 +107,7 @@ try {
     $request = [IO.File]::ReadAllText($RequestFile, $utf8) | ConvertFrom-Json
     $result = switch ($request.Action) {
         'List' { @{ Releases = @(Get-X16Releases) } }
-        'Install' { @{ Exe = (Install-X16Release $request.Release $request.Destination) } }
+        'Install' { Install-X16Release $request.Release $request.Destination $request.Overwrite }
         default { throw 'Unknown launcher operation.' }
     }
     $message = $result | ConvertTo-Json -Depth 6 -Compress

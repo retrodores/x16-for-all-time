@@ -8,9 +8,9 @@ namespace CommanderX16
 {
     internal static class EmulatorProcess
     {
-        public static Task Start(Request request) => Task.Run(() => StartAndCheck(request));
+        public static Task Start(Request request, IProgress<string> lateFailure = null) => Task.Run(() => StartAndCheck(request, lateFailure));
 
-        private static void StartAndCheck(Request request)
+        private static void StartAndCheck(Request request, IProgress<string> lateFailure)
         {
             var process = new Process
             {
@@ -59,7 +59,17 @@ namespace CommanderX16
                     throw new IOException("X16Emu exited during startup (code " + errorCode + ")." +
                         (message.Length == 0 ? "" : Environment.NewLine + message));
                 }
-                process.Exited += (sender, args) => process.Dispose();
+                process.Exited += (sender, args) =>
+                {
+                    try
+                    {
+                        if (process.ExitCode == unchecked((int)0xC0000135))
+                            lateFailure?.Report("A required emulator DLL could not be loaded.");
+                        else if (process.ExitCode != 0)
+                            lateFailure?.Report("Emulator exited with code " + process.ExitCode + ".");
+                    }
+                    finally { process.Dispose(); }
+                };
                 process.EnableRaisingEvents = true;
                 monitorInBackground = true;
             }

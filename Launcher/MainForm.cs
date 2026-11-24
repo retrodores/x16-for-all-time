@@ -215,6 +215,8 @@ namespace CommanderX16
                             data.Emulators.Add(emulator);
                         }
                         emulator.Name = dialog.BuildName;
+                        if (!Same(emulator.Exe, dialog.Executable))
+                            emulator.InstallRoot = null;
                         emulator.Exe = dialog.Executable;
                         emulator.UpstreamOptions = dialog.StandardOptions;
                     });
@@ -230,7 +232,7 @@ namespace CommanderX16
             var emulator = SelectedEmulator;
             if (emulator == null) return;
             var affected = store.Data.Programs.Where(program => program.EmulatorId == emulator.Id).ToArray();
-            string message = "Remove " + emulator.Name + " from the emulator list? Its files will stay on disk.";
+            string message = "Remove " + emulator.Name + " from the emulator list?";
             if (affected.Length != 0)
             {
                 string names = string.Join(Environment.NewLine, affected.Take(10).Select(program => "• " + program.Name));
@@ -241,11 +243,59 @@ namespace CommanderX16
             }
             if (store.Data.StartEmulatorId == emulator.Id)
                 message += Environment.NewLine + Environment.NewLine + "Choose a new emulator in Start defaults.";
-            if (MessageBox.Show(this, message, "Remove emulator", MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
-                return;
-
-            store.Save(settings => settings.RemoveEmulator(emulator));
+            string folder = EmulatorFolders.Root(emulator);
+            using (var dialog = new Form
+            {
+                Text = "Remove emulator", Font = Font, AutoScaleMode = AutoScaleMode.Dpi,
+                StartPosition = FormStartPosition.CenterParent, ClientSize = new Size(650, 345),
+                MinimizeBox = false, MaximizeBox = false
+            })
+            {
+                var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+                var body = Table();
+                body.Padding = new Padding(14);
+                scroll.Controls.Add(body);
+                dialog.Controls.Add(scroll);
+                AddRow(body, new Label { Text = message, AutoSize = true, MaximumSize = new Size(590, 0) });
+                var delete = new CheckBox { Text = "Also delete the emulator directory and its contents", AutoSize = true };
+                var path = Entry();
+                path.ReadOnly = true;
+                path.Text = folder;
+                AddRow(body, delete);
+                AddRow(body, Pair("Emulator directory", path));
+                var cancel = Button("Cancel");
+                cancel.DialogResult = DialogResult.Cancel;
+                var remove = Button("Remove from list");
+                remove.DialogResult = DialogResult.OK;
+                delete.CheckedChanged += (sender, args) => remove.Text = delete.Checked ? "Remove and delete" : "Remove from list";
+                var actions = Flow(remove, cancel);
+                actions.Dock = DockStyle.Bottom;
+                dialog.Controls.Add(actions);
+                dialog.AcceptButton = cancel;
+                dialog.CancelButton = cancel;
+                if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                if (delete.Checked)
+                {
+                    EmulatorFolders.CheckDelete(folder, store.Data, emulator);
+                    string staged = folder + ".removing-" + Guid.NewGuid().ToString("N").Substring(0, 8);
+                    Directory.Move(folder, staged);
+                    try { store.Save(settings => settings.RemoveEmulator(emulator)); }
+                    catch
+                    {
+                        try { Directory.Move(staged, folder); }
+                        catch (Exception error) { throw new IOException("Could not restore the emulator folder from " + staged, error); }
+                        throw;
+                    }
+                    try { Directory.Delete(staged, true); }
+                    catch (Exception error)
+                    {
+                        ShowError(new IOException("Emulator removed from list. Could not finish deleting files at " + staged +
+                            Environment.NewLine + error.Message, error));
+                    }
+                }
+                else
+                    store.Save(settings => settings.RemoveEmulator(emulator));
+            }
             BindEmulators(null, null);
             RefreshPrograms();
             status.Text = "Emulator removed from list";

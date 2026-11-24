@@ -35,6 +35,7 @@ namespace CommanderX16
         private readonly Button confirm;
         private Profile options;
         private bool loading;
+        private bool preserveUnassignedOptions;
 
         public Emulator Emulator => builds.SelectedItem as Emulator;
         public Profile Options { get; private set; }
@@ -51,6 +52,7 @@ namespace CommanderX16
             initialEmulator = selected;
             bool fixedBuild = profileName != null;
             this.savedOptions = savedOptions;
+            preserveUnassignedOptions = program != null && selected == null && savedOptions != null;
             Text = title;
             Font = new Font("Segoe UI", 10);
             AutoScaleMode = AutoScaleMode.Dpi;
@@ -156,6 +158,12 @@ namespace CommanderX16
         private void LoadBuild()
         {
             RefreshProfiles();
+            if (preserveUnassignedOptions && Emulator != null)
+            {
+                preserveUnassignedOptions = false;
+                LoadOptions(Profile.Snapshot(options, Emulator));
+                return;
+            }
             var profile = settings.DefaultProfile(Emulator);
             loading = true;
             if (profile != null)
@@ -178,7 +186,7 @@ namespace CommanderX16
                 .Cast<object>().ToArray());
             profiles.SelectedIndex = 0;
             profiles.Enabled = Emulator != null;
-            hardware.Enabled = Emulator?.UpstreamOptions == true;
+            hardware.Enabled = Emulator?.UpstreamOptions ?? (program != null);
             loading = false;
         }
 
@@ -285,8 +293,9 @@ namespace CommanderX16
                     if (EntryName.Length == 0) throw new InvalidOperationException("Enter a PRG name.");
                     var emulator = UseStartDefaults ? settings.FindEmulator(settings.StartEmulatorId) : Emulator;
                     var launchOptions = UseStartDefaults ? settings.StartOptions ?? new Profile() : options;
-                    preview.Text = UseStartDefaults && emulator == null
-                        ? "Set an emulator in Start defaults before launching."
+                    preview.Text = emulator == null
+                        ? (UseStartDefaults ? "Set an emulator in Start defaults before launching." :
+                            "Settings can be saved. Choose an emulator before launching.")
                         : CommandPreview(Launch.Prepare(emulator, launchOptions, ProgramPath, false));
                 }
                 else

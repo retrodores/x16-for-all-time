@@ -21,3 +21,7 @@ Each build starts with a **Default** profile and can have additional named profi
 ## Build on Windows
 
 Use a Visual Studio Developer PowerShell with the .NET Framework 4.8 targeting pack and Inno Setup 6. Run .\Build.ps1 to compile the application and create dist\CommanderX16ForRightNow-Setup.exe. Use -ISCC if Inno Setup is installed elsewhere. Windows PowerShell 5.1 handles emulator release discovery and installation.
+
+## Installing and removing emulators
+
+The installer shows progress while checking releases, downloading, verifying, extracting and installing. For an existing folder, **Overwrite existing installation** stages the replacement before moving the original to a backup folder. Existing registrations keep their profiles and PRG assignments. **Remove from list** leaves files on disk unless you choose **Also delete the emulator directory and its contents**. PRG entries and their settings can be edited before an emulator is available.

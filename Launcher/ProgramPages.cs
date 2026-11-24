@@ -13,6 +13,7 @@ namespace CommanderX16
         private readonly ListBox startMenu = ProgramList();
         private readonly ListBox catalog = ProgramList();
         private readonly Button startSettings = Button("Launch settings…");
+        private int launchAttempt;
         private readonly CheckBox saveGif = new CheckBox { Text = "Save GIF", AutoSize = true };
         private readonly TextBox gifFile = Entry();
         private readonly Button startDefaults = Button("Start defaults…");
@@ -177,9 +178,9 @@ namespace CommanderX16
                     var entry = create ? program : data.Programs.Single(item => item.Id == program.Id);
                     entry.Name = dialog.EntryName;
                     entry.Path = dialog.ProgramPath;
-                    entry.EmulatorId = dialog.UseStartDefaults ? null : dialog.Emulator.Id;
+                    entry.EmulatorId = dialog.UseStartDefaults ? null : dialog.Emulator?.Id;
                     entry.Options = dialog.UseStartDefaults ? null : dialog.Options;
-                    entry.RequiresEmulatorSelection = false;
+                    entry.RequiresEmulatorSelection = !dialog.UseStartDefaults && dialog.Emulator == null;
                     entry.ProfileId = null;
                     if (create) data.Programs.Add(entry);
                 });
@@ -219,27 +220,33 @@ namespace CommanderX16
             Launch.Quote(request.Exe) + " " + request.Arguments + Environment.NewLine +
                 "Working directory: " + request.WorkingDirectory;
 
-        private string Describe(ProgramEntry program, Emulator emulator)
-        {
-            try { return CommandPreview(Prepare(program, emulator, false)); }
-            catch (Exception error) { return error.Message; }
-        }
-
         private void RefreshPreview()
         {
             var program = startMenu.SelectedItem as ProgramEntry;
             var emulator = program == null ? null : store.Data.LaunchEmulator(program);
-            run.Enabled = !launching && program != null;
+            run.Enabled = false;
+            run.Text = program != null && store.Data.LaunchOptions(program).AutoRun ? "Run PRG" : "Load PRG";
             saveGif.Enabled = !launching && program != null;
             gifFile.Enabled = saveGif.Enabled && saveGif.Checked;
             startDefaults.Enabled = !launching && store.Data.Emulators.Count != 0;
             launchConfiguration.Text = emulator == null ? "Command preview" :
                 (store.Data.UsesStartDefaults(program) ? "Start defaults" : "PRG settings") + " · " + emulator.Name;
             startSettings.Enabled = !launching && program != null;
-            copy.Enabled = emulator != null;
+            copy.Enabled = false;
             if (program == null) preview.Text = store.Data.Programs.Count == 0 ? "Add a PRG to get started." : "No matching PRGs.";
             else if (store.Data.Emulators.Count == 0) preview.Text = "Register or install an X16Emu build on the Emulators tab.";
-            else preview.Text = emulator == null ? MissingLaunchSetup(program) : Describe(program, emulator);
+            else if (emulator == null) preview.Text = MissingLaunchSetup(program);
+            else
+            {
+                try
+                {
+                    var command = Prepare(program, emulator, true);
+                    run.Text = Launch.HasExtraOption(command.Arguments, "-run") ? "Run PRG" : "Load PRG";
+                    run.Enabled = copy.Enabled = !launching;
+                    preview.Text = CommandPreview(command);
+                }
+                catch (Exception error) { preview.Text = error.Message; }
+            }
         }
 
         private void CopyPreview()
@@ -263,7 +270,7 @@ namespace CommanderX16
 
         private async Task RunSelected(ProgramEntry program)
         {
-            if (launching || program == null) return;
+            if (launching || program == null || !run.Enabled) return;
             Request request = null;
             try
             {
@@ -276,8 +283,14 @@ namespace CommanderX16
                 preview.Text = CommandPreview(request);
                 copy.Enabled = false;
                 launchStatus.Text = "Starting…";
-                await EmulatorProcess.Start(request);
-                launchStatus.Text = "Emulator started";
+                int attempt = ++launchAttempt;
+                string lateError = null;
+                await EmulatorProcess.Start(request, new Progress<string>(message =>
+                {
+                    lateError = message;
+                    if (attempt == launchAttempt && !IsDisposed) launchStatus.Text = message;
+                }));
+                if (lateError == null) launchStatus.Text = "Emulator launched";
             }
             catch (Exception error)
             {

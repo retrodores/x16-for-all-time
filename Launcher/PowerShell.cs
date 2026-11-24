@@ -7,9 +7,9 @@ namespace CommanderX16
 {
     internal static class PowerShell
     {
-        public static Task<Result> Execute(Request request) => Task.Run(() => Run(request));
+        public static Task<Result> Execute(Request request, IProgress<string> progress = null) => Task.Run(() => Run(request, progress));
 
-        private static Result Run(Request request)
+        private static Result Run(Request request, IProgress<string> progress)
         {
             string script = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "X16.ps1");
             string shell = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
@@ -30,10 +30,18 @@ namespace CommanderX16
                         " -ResultFile " + Launch.Quote(resultFile),
                     UseShellExecute = false,
                     CreateNoWindow = true,
-                    RedirectStandardError = true
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true
                 };
                 using (Process process = Process.Start(start))
                 {
+                    const string prefix = "X16-STAGE:";
+                    process.OutputDataReceived += (sender, args) =>
+                    {
+                        if (args.Data?.StartsWith(prefix, StringComparison.Ordinal) == true)
+                            progress?.Report(args.Data.Substring(prefix.Length));
+                    };
+                    process.BeginOutputReadLine();
                     Task<string> errors = process.StandardError.ReadToEndAsync();
                     process.WaitForExit(-1);
                     if (process.ExitCode != 0)
