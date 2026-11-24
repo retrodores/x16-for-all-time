@@ -1,5 +1,7 @@
 # Commander X16 For Now
 
+*For Now, not Forever*
+
 A Windows launcher for running a library of Commander X16 programs with your choice of X16Emu build.
 
 ## Start

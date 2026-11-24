@@ -1,5 +1,5 @@
 #define AppName "Commander X16 For Now"
-#define AppVersion "0.7.3"
+#define AppVersion "0.7.4"
 #define BinDir "..\Launcher\bin\Release"
 
 [Setup]
