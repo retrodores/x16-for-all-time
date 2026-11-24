@@ -1,5 +1,5 @@
-#define AppName "Commander X16 For Right Now"
-#define AppVersion "0.7.2"
+#define AppName "Commander X16 For Now"
+#define AppVersion "0.7.3"
 #define BinDir "..\Launcher\bin\Release"
 
 [Setup]
@@ -10,12 +10,13 @@ AppPublisher=Retrodores
 AppPublisherURL=https://github.com/retrodores/x16-right-now
 DefaultDirName={localappdata}\Programs\CommanderX16ForRightNow
 DefaultGroupName={#AppName}
+UsePreviousGroup=no
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 MinVersion=10.0
 CloseApplications=yes
 OutputDir=..\dist
-OutputBaseFilename=CommanderX16ForRightNow-Setup
+OutputBaseFilename=CommanderX16ForNow-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -31,6 +32,10 @@ Source: "{#BinDir}\X16.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\CommanderX16ForRightNow.exe"
+
+[InstallDelete]
+Type: files; Name: "{userprograms}\Commander X16 For Right Now\Commander X16 For Right Now.lnk"
+Type: dirifempty; Name: "{userprograms}\Commander X16 For Right Now"
 
 [Run]
 Filename: "{app}\CommanderX16ForRightNow.exe"; Description: "Open {#AppName}"; Flags: nowait postinstall skipifsilent

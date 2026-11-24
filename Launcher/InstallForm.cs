@@ -136,7 +136,7 @@ namespace CommanderX16
                     EmulatorFolders.CheckDirectory(path, store.Data, RegisteredAt(path));
                     overwrite.Enabled = true;
                     status.Text = overwrite.Checked
-                        ? "The previous installation will be kept in a backup folder."
+                        ? "The previous installation will be permanently deleted after the replacement is registered."
                         : "Destination already exists. Choose another folder or check Overwrite.";
                     install.Enabled = overwrite.Checked;
                     return;
@@ -209,10 +209,9 @@ namespace CommanderX16
                 bool replace = overwrite.Checked && Directory.Exists(path);
                 if (replace)
                 {
-                    EmulatorFolders.CheckDirectory(path, store.Data, existing);
-                    if (MessageBox.Show(this, "Replace this installation? The old files will be kept in a backup folder." +
-                        Environment.NewLine + path, Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question,
-                        MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+                    EmulatorFolders.CheckDelete(path, store.Data, existing);
+                    if (!LauncherDialogs.Confirm(this, "Replace this installation? The old folder and its contents will be permanently deleted after the replacement is registered." +
+                        Environment.NewLine + Environment.NewLine + path, Text)) return;
                 }
                 SetBusy(true);
                 status.Text = "Preparing " + selected.Tag + "…";
@@ -242,8 +241,22 @@ namespace CommanderX16
                 recorded = true;
                 EmulatorId = id;
                 if (backup != null)
-                    MessageBox.Show(this, "Previous installation saved at:" + Environment.NewLine + backup,
-                        Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                {
+                    status.Text = "Removing the previous installation…";
+                    try
+                    {
+                        await Task.Run(() =>
+                        {
+                            EmulatorFolders.CheckDelete(backup, store.Data, null);
+                            Directory.Delete(backup, recursive: true);
+                        });
+                    }
+                    catch (Exception error)
+                    {
+                        LauncherDialogs.Message(this, "The replacement is installed, but the previous folder could not be fully deleted." +
+                            Environment.NewLine + backup + Environment.NewLine + error.Message, Text);
+                    }
+                }
                 DialogResult = DialogResult.OK;
             }
             catch (Exception error)
@@ -266,7 +279,7 @@ namespace CommanderX16
                 }
                 else if (writtenExe != null && !recorded)
                     message += Environment.NewLine + "The files were installed. Register the existing folder at " + Path.GetDirectoryName(writtenExe);
-                MessageBox.Show(this, message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LauncherDialogs.Message(this, message, Text);
             }
             finally { SetBusy(false); }
             if (DialogResult == DialogResult.OK) Close();

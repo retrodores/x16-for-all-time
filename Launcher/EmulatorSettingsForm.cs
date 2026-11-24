@@ -99,6 +99,6 @@ namespace CommanderX16
         }
 
         private void ShowError(string message) =>
-            MessageBox.Show(this, message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            LauncherDialogs.Message(this, message, Text);
     }
 }

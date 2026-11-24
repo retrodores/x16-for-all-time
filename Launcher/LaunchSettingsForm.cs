@@ -317,8 +317,8 @@ namespace CommanderX16
             if (program == null && !builds.Enabled && (EntryName.Length == 0 || settings.Profiles.Any(profile =>
                 profile.Id != profileId && profile.EmulatorId == Emulator.Id && Same(profile.Name, EntryName))))
             {
-                MessageBox.Show(this, EntryName.Length == 0 ? "Enter a profile name." :
-                    "That profile name is already in use for this emulator.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                LauncherDialogs.Message(this, EntryName.Length == 0 ? "Enter a profile name." :
+                    "That profile name is already in use for this emulator.", Text);
                 name.Focus();
                 return;
             }

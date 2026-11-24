@@ -6,7 +6,7 @@ namespace CommanderX16
 {
     internal static class Program
     {
-        internal const string Title = "Commander X16 For Right Now";
+        internal const string Title = "Commander X16 For Now";
 
         [STAThread]
         private static void Main()
@@ -25,7 +25,7 @@ namespace CommanderX16
             }
             catch (Exception error)
             {
-                MessageBox.Show(error.Message, Title, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LauncherDialogs.Message(null, error.Message, Title);
             }
         }
     }

@@ -149,7 +149,7 @@ namespace CommanderX16
             using (var dialog = new LaunchSettingsForm(store.Data, title, emulator, source,
                 profileName: initialName, profileId: id))
             {
-                if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                if (LauncherDialogs.Show(dialog, this) != DialogResult.OK) return;
                 var saved = dialog.Options;
                 saved.Id = id;
                 saved.EmulatorId = emulator.Id;
@@ -172,8 +172,7 @@ namespace CommanderX16
             string message = "Delete the profile " + profile.Name + "?";
             if (emulator.DefaultProfileId == profile.Id)
                 message += Environment.NewLine + "A fresh default profile will be created for this emulator.";
-            if (MessageBox.Show(this, message, "Delete profile",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+            if (!LauncherDialogs.Confirm(this, message, "Delete profile"))
                 return;
             store.Save(data =>
             {
@@ -204,7 +203,7 @@ namespace CommanderX16
             {
                 using (var dialog = new EmulatorSettingsForm(existing))
                 {
-                    if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                    if (LauncherDialogs.Show(dialog, this) != DialogResult.OK) return;
                     var other = store.Data.Emulators.FirstOrDefault(e => e.Id != existing?.Id && Same(e.Exe, dialog.Executable));
                     if (other != null)
                     {
@@ -280,7 +279,7 @@ namespace CommanderX16
                 dialog.Controls.Add(actions);
                 dialog.AcceptButton = cancel;
                 dialog.CancelButton = cancel;
-                if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                if (LauncherDialogs.Show(dialog, this) != DialogResult.OK) return;
                 if (delete.Checked)
                 {
                     EmulatorFolders.CheckDelete(folder, store.Data, emulator);
@@ -312,7 +311,7 @@ namespace CommanderX16
         {
             using (var dialog = new InstallForm(store))
             {
-                if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                if (LauncherDialogs.Show(dialog, this) != DialogResult.OK) return;
                 BindEmulators(dialog.EmulatorId, null);
                 RefreshPrograms();
                 status.Text = "Release installed";
@@ -328,7 +327,7 @@ namespace CommanderX16
             using (var sectionFont = new Font(Font, FontStyle.Bold))
             using (var dialog = new Form
             {
-                Text = "About " + Program.Title, Font = Font, Icon = Icon,
+                Text = "About " + Program.Title, Font = Font,
                 AutoScaleMode = AutoScaleMode.Dpi, ClientSize = new Size(560, 310),
                 StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false, MinimizeBox = false, ShowInTaskbar = false
@@ -372,7 +371,7 @@ namespace CommanderX16
                 AddRow(body, close);
                 dialog.AcceptButton = dialog.CancelButton = close;
                 dialog.ActiveControl = close;
-                dialog.ShowDialog(this);
+                LauncherDialogs.Show(dialog, this);
             }
         }
 
@@ -391,7 +390,7 @@ namespace CommanderX16
         }
 
         private void ShowError(Exception error) =>
-            MessageBox.Show(this, error.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            LauncherDialogs.Message(this, error.Message, Text);
 
         internal static bool Same(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
         private static void SelectById(ComboBox box, int index)

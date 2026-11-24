@@ -106,8 +106,8 @@ namespace CommanderX16
         private void RemoveProgram()
         {
             var program = (ProgramEntry)startMenu.SelectedItem;
-            if (MessageBox.Show(this, "Remove " + program.Name + " from the PRG list? The program file will stay on disk.",
-                "Remove PRG", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+            if (!LauncherDialogs.Confirm(this, "Remove " + program.Name + " from the PRG list? The program file will stay on disk.",
+                "Remove PRG"))
                 return;
             store.Save(data => data.Programs.RemoveAll(entry => entry.Id == program.Id));
             RefreshPrograms();
@@ -131,7 +131,7 @@ namespace CommanderX16
                 emulator = store.Data.Emulators[0];
             using (var dialog = new LaunchSettingsForm(store.Data, title, emulator, initial, program))
             {
-                if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                if (LauncherDialogs.Show(dialog, this) != DialogResult.OK) return;
                 store.Save(data =>
                 {
                     var entry = create ? program : data.Programs.Single(item => item.Id == program.Id);
@@ -156,7 +156,7 @@ namespace CommanderX16
                 current == null ? null : store.Data.StartOptions,
                 clearAction: current == null ? null : "Clear Start defaults"))
             {
-                var result = dialog.ShowDialog(this);
+                var result = LauncherDialogs.Show(dialog, this);
                 if (result != DialogResult.OK && result != DialogResult.Abort) return;
                 store.Save(settings =>
                 {
@@ -257,7 +257,7 @@ namespace CommanderX16
                 launchActivity.Hide();
                 launchStatus.Text = "Launch failed";
                 string details = error.Message + (request == null ? "" : Environment.NewLine + Environment.NewLine + CommandPreview(request));
-                MessageBox.Show(this, details, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LauncherDialogs.Message(this, details, Text);
             }
             finally
             {

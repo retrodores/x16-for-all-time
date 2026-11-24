@@ -1,6 +1,6 @@
 using System.Reflection;
 
-[assembly: AssemblyTitle("Commander X16 For Right Now")]
-[assembly: AssemblyProduct("Commander X16 For Right Now")]
-[assembly: AssemblyVersion("0.7.2.0")]
-[assembly: AssemblyFileVersion("0.7.2.0")]
+[assembly: AssemblyTitle(CommanderX16.Program.Title)]
+[assembly: AssemblyProduct(CommanderX16.Program.Title)]
+[assembly: AssemblyVersion("0.7.3.0")]
+[assembly: AssemblyFileVersion("0.7.3.0")]
