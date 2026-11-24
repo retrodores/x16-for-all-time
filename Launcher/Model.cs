@@ -469,7 +469,7 @@ namespace CommanderX16
         public static Profile WithGifOverride(Profile source, Emulator emulator, string output)
         {
             var copy = Profile.CopyOptions(source, emulator);
-            copy.Gif = string.IsNullOrWhiteSpace(output) ? "demo.gi" : output.Trim();
+            copy.Gif = string.IsNullOrWhiteSpace(output) ? "demo.gif" : output.Trim();
             string extra = copy.Extra ?? emulator?.Extra ?? "";
             var tokens = ArgumentTokens.Matches(extra).Cast<Match>().ToArray();
             for (int i = tokens.Length - 1; i >= 0; i--)

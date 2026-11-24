@@ -40,7 +40,7 @@ namespace CommanderX16
             AddRow(startBody, startMenu, SizeType.Percent, 100);
             gifFile.AccessibleName = "GIF output file";
             AddRow(startBody, Pair("", saveGif));
-            AddRow(startBody, Pair("File (blank: demo.gi)", gifFile));
+            AddRow(startBody, Pair("File (blank: demo.gif)", gifFile));
             AddRow(startBody, launchConfiguration);
             AddRow(startBody, preview, SizeType.Absolute, 83);
             run.BackColor = Teal;
