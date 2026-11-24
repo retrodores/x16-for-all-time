@@ -366,7 +366,7 @@ namespace CommanderX16
                     AutoSize = true, Margin = new Padding(0, 0, 0, 12)
                 });
                 AddRow(body, new Label { Text = "Project and credits", Font = sectionFont, AutoSize = true });
-                AddRow(body, AboutLink("Source and releases", "https://github.com/retrodores/x16-right-now"));
+                AddRow(body, AboutLink("Source and releases", "https://github.com/retrodores/x16-for-now"));
                 AddRow(body, AboutLink("Retrodores on GitHub", "https://github.com/retrodores"));
                 AddRow(body, AboutLink("Commander X16 emulator", "https://github.com/X16Community/x16-emulator"));
                 AddRow(body, new Panel(), SizeType.Percent, 100);

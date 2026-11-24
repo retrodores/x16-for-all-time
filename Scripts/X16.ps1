@@ -9,7 +9,7 @@ $utf8 = [System.Text.UTF8Encoding]::new($false)
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
 
 function Get-X16Releases {
-    $headers = @{ 'User-Agent' = 'CommanderX16ForNow'; Accept = 'application/vnd.github+json' }
+    $headers = @{ 'User-Agent' = 'X16ForAllTime'; Accept = 'application/vnd.github+json' }
     $catalog = Invoke-RestMethod -UseBasicParsing -TimeoutSec 30 -Headers $headers -Uri 'https://api.github.com/repos/X16Community/x16-emulator/releases?per_page=100'
     foreach ($release in $catalog) {
         if ($release.draft -or $release.prerelease) { continue }

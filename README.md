@@ -1,4 +1,4 @@
-# Commander X16 For Now
+# X16 For All Time
 
 *For Now, not Forever*
 
@@ -24,7 +24,7 @@ Each build starts with a **Default** profile and can have additional named profi
 
 ## Build on Windows
 
-Use a Visual Studio Developer PowerShell with the .NET Framework 4.8 targeting pack and Inno Setup 6. Run .\Build.ps1 to compile the application and create dist\CommanderX16ForNow-Setup.exe. Use -ISCC if Inno Setup is installed elsewhere. Windows PowerShell 5.1 handles emulator release discovery and installation.
+Use a Visual Studio Developer PowerShell with the .NET Framework 4.8 targeting pack and Inno Setup 6. Run .\Build.ps1 to compile the application and create dist\X16ForAllTime-Setup.exe. Use -ISCC if Inno Setup is installed elsewhere. Windows PowerShell 5.1 handles emulator release discovery and installation.
 
 ## Installing and removing emulators
 
