@@ -16,8 +16,8 @@ namespace CommanderX16
         private readonly Button run = Button("Run"), copy = Button("Copy PowerShell");
         private readonly Label launchStatus = new Label { AutoSize = true, ForeColor = Navy };
         private readonly Label status = new Label { AutoSize = true, ForeColor = Navy };
-        private readonly Button editBuild = Button("Edit build…"), removeBuild = Button("Remove from list…");
-        private readonly Button newProfile = Button("New profile…"), editProfile = Button("Edit…"),
+        private readonly Button editBuild = Button("Edit emulator…"), removeBuild = Button("Remove from list…");
+        private readonly Button newProfile = Button("New profile…"), editProfile = Button("Edit profile…"),
             duplicateProfile = Button("Duplicate…"), deleteProfile = Button("Delete…"), defaultProfile = Button("Set as default");
         private readonly Label profileDefault = new Label { AutoSize = true };
         private readonly TextBox emulatorPath = new TextBox { ReadOnly = true, Dock = DockStyle.Fill };
@@ -112,7 +112,7 @@ namespace CommanderX16
             var available = store.Data.Profiles.Where(profile =>
                 SelectedEmulator != null && profile.EmulatorId == SelectedEmulator.Id).ToArray();
             profiles.Items.AddRange(available.Cast<object>().ToArray());
-            SelectById(profiles, Array.FindIndex(available, profile => profile.Id == profileId));
+            SelectById(profiles, Array.FindIndex(available, profile => profile.Id == (profileId ?? SelectedEmulator?.DefaultProfileId)));
             binding = false;
             UpdateProfileActions();
             RefreshPreview();
@@ -125,9 +125,7 @@ namespace CommanderX16
             editBuild.Enabled = removeBuild.Enabled = newProfile.Enabled = emulator != null;
             profiles.Enabled = editProfile.Enabled = duplicateProfile.Enabled = deleteProfile.Enabled = SelectedProfile != null;
             var currentDefault = store.Data.DefaultProfile(emulator);
-            defaultProfile.Text = currentDefault?.Id == SelectedProfile?.Id && currentDefault != null
-                ? "Clear default" : "Set as default";
-            defaultProfile.Enabled = SelectedProfile != null;
+            defaultProfile.Enabled = SelectedProfile != null && SelectedProfile.Id != currentDefault?.Id;
             profileDefault.Text = emulator == null ? "" : currentDefault?.Name == null
                 ? "New configurations use emulator defaults."
                 : "Default profile for new configurations: " + currentDefault.Name;
@@ -164,7 +162,10 @@ namespace CommanderX16
         {
             var emulator = SelectedEmulator;
             var profile = SelectedProfile;
-            if (MessageBox.Show(this, "Delete the profile " + profile.Name + "?", "Delete profile",
+            string message = "Delete the profile " + profile.Name + "?";
+            if (emulator.DefaultProfileId == profile.Id)
+                message += Environment.NewLine + "A fresh default profile will be created for this emulator.";
+            if (MessageBox.Show(this, message, "Delete profile",
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
                 return;
             store.Save(data =>
@@ -184,7 +185,7 @@ namespace CommanderX16
             store.Save(data =>
             {
                 var build = data.FindEmulator(emulatorId);
-                build.DefaultProfileId = build.DefaultProfileId == profileId ? null : profileId;
+                build.DefaultProfileId = profileId;
             });
             BindEmulators(emulatorId, profileId);
             status.Text = "Default profile updated";
@@ -201,7 +202,7 @@ namespace CommanderX16
                     if (other != null)
                     {
                         BindEmulators(other.Id, null);
-                        throw new InvalidOperationException("This executable is already registered as " + other.Name + ". Use Edit build to update it.");
+                        throw new InvalidOperationException("This executable is already registered as " + other.Name + ". Use Edit emulator to update it.");
                     }
                     string id = existing?.Id ?? Guid.NewGuid().ToString("N");
                     string profileId = SelectedProfile?.Id;
@@ -216,8 +217,6 @@ namespace CommanderX16
                         emulator.Name = dialog.BuildName;
                         emulator.Exe = dialog.Executable;
                         emulator.UpstreamOptions = dialog.StandardOptions;
-                        emulator.Extra = dialog.Extra;
-                        emulator.DefaultRom = dialog.DefaultRom;
                     });
                     BindEmulators(id, profileId);
                     RefreshPrograms();

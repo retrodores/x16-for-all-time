@@ -12,9 +12,9 @@ Use **Add PRG** or **Edit PRG** to set the name, path, and launch settings in on
 
 ## Emulators and profiles
 
-Use **Register existing** for an unpacked folder or executable, including renamed builds. **Install or update** installs official Windows releases side by side. **Edit build** updates the executable path, optional ROM, and default extra arguments. These extra arguments are copied into new configurations. For the serial-network fork, use its compatible ROM and DLLs and enter -serialcard in Extra arguments.
+Use **Register existing** for an unpacked folder or executable, including renamed builds. **Install or update** installs official Windows releases side by side. **Edit emulator** updates the build name, executable path, and whether standard X16Emu options are supported. ROM and extra arguments are set in the build’s profile. For the serial-network fork, use its compatible ROM and DLLs and enter -serialcard in the profile’s Extra arguments.
 
-Each build has named profiles with **New profile**, **Edit**, **Duplicate**, **Delete**, and **Set as default**. Profiles prefill PRG settings and Start defaults. Saving either makes an independent copy, including the effective ROM and extra arguments. The standard controls show Commander X16 hardware choices. **Advanced hardware** contains 65C816 emulation and custom clock and RAM values. Display scaling is available in the same editor.
+Each build starts with a **Default** profile and can have additional named profiles with **New profile**, **Edit**, **Duplicate**, **Delete**, and **Set as default**. Profiles prefill PRG settings and Start defaults. Saving either makes an independent copy, including the effective ROM and extra arguments. The standard controls show Commander X16 hardware choices. **Advanced hardware** contains 65C816 emulation and custom clock and RAM values. Display scaling is available in the same editor.
 
 **Remove from list** removes a registration and keeps its files on disk. PRGs referring to the build keep their options and ask for a new emulator. Profiles from removed builds remain available to copy.
 

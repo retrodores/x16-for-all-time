@@ -129,7 +129,8 @@ namespace CommanderX16
             profiles.SelectedIndexChanged += (sender, args) =>
             {
                 if (loading || profiles.SelectedIndex < 0) return;
-                var source = profiles.SelectedIndex == 0 ? savedOptions : profiles.SelectedItem as Profile;
+                var source = Equals(profiles.SelectedItem, "Saved settings")
+                    ? savedOptions : profiles.SelectedItem as Profile;
                 LoadOptions(Profile.Snapshot(source, Emulator));
             };
             foreach (var box in new[] { cpu, scale, ram, mhz })
@@ -160,7 +161,7 @@ namespace CommanderX16
             if (profile != null)
                 profiles.SelectedItem = profile;
             else if (Emulator != null)
-                profiles.SelectedIndex = 1;
+                profiles.SelectedItem = "Emulator defaults";
             loading = false;
             LoadOptions(Profile.Snapshot(profile, Emulator));
         }

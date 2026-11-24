@@ -28,6 +28,7 @@ namespace CommanderX16
         [DataMember] public bool GenericExtrasMigrated = true;
         [DataMember] public bool ProfileCopiesMigrated = true;
         [DataMember] public bool RomCopiesMigrated = true;
+        [DataMember] public bool BuildDefaultsMigrated = true;
         [DataMember] public string StartEmulatorId;
         [DataMember] public Profile StartOptions;
 
@@ -89,6 +90,43 @@ namespace CommanderX16
                 if (start != null)
                     StartOptions = Profile.Snapshot(StartOptions, start, legacyRom: true);
                 RomCopiesMigrated = true;
+            }
+            if (!BuildDefaultsMigrated)
+            {
+                // Copy legacy build-wide values before retiring those editable build fields.
+                EnsureDefaultProfiles();
+                foreach (var profile in Profiles)
+                {
+                    var build = FindEmulator(profile.EmulatorId);
+                    if (build == null) continue;
+                    var copy = Profile.Snapshot(profile, build);
+                    profile.Extra = copy.Extra;
+                    profile.Rom = copy.Rom;
+                }
+                foreach (var build in Emulators)
+                {
+                    build.Extra = null;
+                    build.DefaultRom = null;
+                }
+                BuildDefaultsMigrated = true;
+            }
+        }
+
+        public void EnsureDefaultProfiles()
+        {
+            foreach (var build in Emulators)
+            {
+                if (DefaultProfile(build) != null) continue;
+                string name = "Default";
+                for (int suffix = 2; Profiles.Any(existing => existing.EmulatorId == build.Id &&
+                    string.Equals(existing.Name, name, StringComparison.OrdinalIgnoreCase)); suffix++)
+                    name = "Default (" + suffix + ")";
+                var profile = Profile.Snapshot(null, build);
+                profile.Id = Guid.NewGuid().ToString("N");
+                profile.EmulatorId = build.Id;
+                profile.Name = name;
+                Profiles.Add(profile);
+                build.DefaultProfileId = profile.Id;
             }
         }
 
@@ -283,7 +321,7 @@ namespace CommanderX16
                 Data = File.Exists(source) ? Json.Read<Settings>(File.ReadAllBytes(source)) : new Settings();
                 if (Data == null || Data.Format != 1 || Data.Emulators == null || Data.Profiles == null)
                     throw new InvalidDataException("Unsupported settings file. Your settings were left on disk.");
-                if (!Data.RomCopiesMigrated || !Data.ProfileCopiesMigrated || !Data.GenericExtrasMigrated || !Data.EntryOptionsMigrated || Data.Programs == null)
+                if (!Data.BuildDefaultsMigrated || !Data.RomCopiesMigrated || !Data.ProfileCopiesMigrated || !Data.GenericExtrasMigrated || !Data.EntryOptionsMigrated || Data.Programs == null)
                     Save(settings => settings.Upgrade());
             }
             catch
@@ -297,6 +335,7 @@ namespace CommanderX16
         {
             Settings copy = Json.Read<Settings>(Json.Write(Data));
             change(copy);
+            copy.EnsureDefaultProfiles();
             string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {
