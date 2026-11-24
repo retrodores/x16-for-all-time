@@ -395,6 +395,11 @@ namespace CommanderX16
             if (validate)
             {
                 CheckPath(exe, "Emulator executable");
+                if (string.Equals(emulator.Asset, "x16emu_win32-r49.zip", StringComparison.OrdinalIgnoreCase) &&
+                    !File.Exists(Path.Combine(Path.GetDirectoryName(exe), "libgcc_s_dw2-1.dll")))
+                    throw new IOException("The official R49 Win32 ZIP is missing libgcc_s_dw2-1.dll. " +
+                        (Environment.Is64BitOperatingSystem ? "Install R49 Win64 and select it for this program." :
+                        "Select a working Win32 build."));
                 CheckPath(prg, "PRG");
                 CheckPath(directory, "Working directory", true);
             }
@@ -433,8 +438,10 @@ namespace CommanderX16
             if (!string.IsNullOrWhiteSpace(profile.Gif))
             {
                 string path = directory == null ? profile.Gif.Trim() : Path.GetFullPath(Path.Combine(directory, profile.Gif.Trim()));
-                if (path.Contains(",") || !string.Equals(Path.GetExtension(path), ".gif", StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException("Choose a .gif output path without commas.");
+                string extension = Path.GetExtension(path);
+                if (path.Contains(",") || !(string.Equals(extension, ".gif", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(extension, ".gi", StringComparison.OrdinalIgnoreCase)))
+                    throw new InvalidOperationException("Choose a .gif or .gi output path without commas.");
                 if (validate)
                 {
                     CheckPath(Path.GetDirectoryName(path), "GIF output folder", true);
@@ -458,6 +465,24 @@ namespace CommanderX16
 
         private static readonly Regex ArgumentTokens = new Regex(
             @"(?:[^\s""]|""(?:\\.|[^""])*"")+", RegexOptions.CultureInvariant);
+
+        public static Profile WithGifOverride(Profile source, Emulator emulator, string output)
+        {
+            var copy = Profile.CopyOptions(source, emulator);
+            copy.Gif = string.IsNullOrWhiteSpace(output) ? "demo.gi" : output.Trim();
+            string extra = copy.Extra ?? emulator?.Extra ?? "";
+            var tokens = ArgumentTokens.Matches(extra).Cast<Match>().ToArray();
+            for (int i = tokens.Length - 1; i >= 0; i--)
+            {
+                var flag = tokens[i];
+                if (!IsOption(flag, "-gif")) continue;
+                var value = i + 1 < tokens.Length && !tokens[i + 1].Value.Trim('"').StartsWith("-", StringComparison.Ordinal)
+                    ? tokens[i + 1] : flag;
+                extra = extra.Remove(flag.Index, value.Index + value.Length - flag.Index);
+            }
+            copy.Extra = extra.Trim();
+            return copy;
+        }
 
         internal static bool HasExtraOption(string extra, string option) =>
             ArgumentTokens.Matches(extra ?? "").Cast<Match>().Any(token => IsOption(token, option));

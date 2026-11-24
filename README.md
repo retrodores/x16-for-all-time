@@ -8,7 +8,7 @@ Double-click an entry or select **Run** to launch it. The entry's saved configur
 
 **Launch settings** on Start or PRGs edits the same entry. Selecting an emulator fills the form from that build's default profile or emulator defaults. Select a different profile to prefill its values. Save a copy of the resulting configuration or choose **Use Start defaults** to let the entry follow the Start list's defaults. An entry whose emulator was removed requires reassignment.
 
-Use **Add PRG** or **Edit PRG** to set the name, path, and launch settings in one dialog. **Duplicate entry** copies those fields into a new entry. **Remove from list** keeps the program file on disk. A relative GIF output path is resolved against the PRG's folder.
+Use **Add PRG** or **Edit PRG** to set the name, path, and launch settings in one dialog. **Duplicate entry** copies those fields into a new entry. **Remove from list** keeps the program file on disk. A relative GIF output path is resolved against the PRG’s folder. On Start, **Save GIF** overrides the recording filename for launches while checked. A blank filename uses demo.gi. The PRG’s saved settings stay intact.
 
 ## Emulators and profiles
 

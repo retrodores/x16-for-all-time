@@ -13,6 +13,8 @@ namespace CommanderX16
         private readonly ListBox startMenu = ProgramList();
         private readonly ListBox catalog = ProgramList();
         private readonly Button startSettings = Button("Launch settings…");
+        private readonly CheckBox saveGif = new CheckBox { Text = "Save GIF", AutoSize = true };
+        private readonly TextBox gifFile = Entry();
         private readonly Button startDefaults = Button("Start defaults…");
         private readonly Label launchConfiguration = new Label { AutoSize = true };
         private readonly Label programProfile = new Label { AutoSize = true };
@@ -36,6 +38,9 @@ namespace CommanderX16
             startMenu.ForeColor = Color.White;
             startMenu.Font = new Font("Segoe UI", 13);
             AddRow(startBody, startMenu, SizeType.Percent, 100);
+            gifFile.AccessibleName = "GIF output file";
+            AddRow(startBody, Pair("", saveGif));
+            AddRow(startBody, Pair("File (blank: demo.gi)", gifFile));
             AddRow(startBody, launchConfiguration);
             AddRow(startBody, preview, SizeType.Absolute, 83);
             run.BackColor = Teal;
@@ -49,6 +54,8 @@ namespace CommanderX16
             AddRow(registry, Pair("Program path", programPath));
             AddRow(registry, Pair("Emulator", programProfile));
 
+            saveGif.CheckedChanged += (sender, args) => RefreshPreview();
+            gifFile.TextChanged += (sender, args) => RefreshPreview();
             search.TextChanged += (sender, args) => BindStart((startMenu.SelectedItem as ProgramEntry)?.Id);
             startMenu.SelectedIndexChanged += (sender, args) => RefreshPreview();
             startMenu.MouseDoubleClick += async (sender, args) =>
@@ -200,8 +207,13 @@ namespace CommanderX16
             }
         }
 
-        private Request Prepare(ProgramEntry program, Emulator emulator, bool validate) =>
-            Launch.Prepare(emulator, store.Data.LaunchOptions(program), program.Path, validate);
+        private Request Prepare(ProgramEntry program, Emulator emulator, bool validate)
+        {
+            var options = store.Data.LaunchOptions(program);
+            if (saveGif.Checked)
+                options = Launch.WithGifOverride(options, emulator, gifFile.Text);
+            return Launch.Prepare(emulator, options, program.Path, validate);
+        }
 
         internal static string CommandPreview(Request request) =>
             Launch.Quote(request.Exe) + " " + request.Arguments + Environment.NewLine +
@@ -218,6 +230,8 @@ namespace CommanderX16
             var program = startMenu.SelectedItem as ProgramEntry;
             var emulator = program == null ? null : store.Data.LaunchEmulator(program);
             run.Enabled = !launching && program != null;
+            saveGif.Enabled = !launching && program != null;
+            gifFile.Enabled = saveGif.Enabled && saveGif.Checked;
             startDefaults.Enabled = !launching && store.Data.Emulators.Count != 0;
             launchConfiguration.Text = emulator == null ? "Command preview" :
                 (store.Data.UsesStartDefaults(program) ? "Start defaults" : "PRG settings") + " · " + emulator.Name;
