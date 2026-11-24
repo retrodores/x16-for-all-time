@@ -17,6 +17,7 @@ namespace CommanderX16
         private readonly CheckBox startDefaults = new CheckBox { Text = "Use Start defaults", AutoSize = true };
         private readonly TableLayoutPanel launchFields = Table();
         private readonly Profile savedOptions;
+        private readonly bool editingStartDefaults;
         private readonly ComboBox builds = Combo(), profiles = Combo();
         private readonly ComboBox cpu = OptionsFor(HardwareOptions.Cpu, value => "65C02");
         private readonly ComboBox mhz = OptionsFor(HardwareOptions.Clock,
@@ -51,6 +52,7 @@ namespace CommanderX16
             this.profileId = profileId;
             initialEmulator = selected;
             bool fixedBuild = profileName != null;
+            editingStartDefaults = program == null && !fixedBuild;
             this.savedOptions = savedOptions;
             preserveUnassignedOptions = program != null && selected == null && savedOptions != null;
             Text = title;
@@ -81,7 +83,7 @@ namespace CommanderX16
             }
             AddRow(launchFields, Pair("Emulator", builds));
             if (!fixedBuild)
-                AddRow(launchFields, Pair("Prefill from profile", profiles));
+                AddRow(launchFields, Pair(editingStartDefaults ? "Load settings" : "Prefill from profile", profiles));
             AddRow(hardware, Pair("CPU", cpu));
             AddRow(hardware, Pair("Clock", mhz));
             AddRow(hardware, Pair("Banked RAM", ram));
@@ -128,10 +130,19 @@ namespace CommanderX16
             int index = settings.Emulators.FindIndex(emulator => emulator.Id == selected?.Id);
             if (index >= 0) builds.SelectedIndex = index;
             builds.SelectedIndexChanged += (sender, args) => LoadBuild();
+            if (editingStartDefaults)
+            {
+                profiles.FormattingEnabled = true;
+                profiles.Format += (sender, args) =>
+                {
+                    if (args.ListItem is Profile profile && profile.Id == Emulator?.DefaultProfileId)
+                        args.Value = profile.Name + " (emulator preset)";
+                };
+            }
             profiles.SelectedIndexChanged += (sender, args) =>
             {
                 if (loading || profiles.SelectedIndex < 0) return;
-                var source = Equals(profiles.SelectedItem, "Saved settings")
+                var source = Equals(profiles.SelectedItem, SavedSettingsLabel)
                     ? savedOptions : profiles.SelectedItem as Profile;
                 LoadOptions(Profile.Snapshot(source, Emulator));
             };
@@ -158,6 +169,11 @@ namespace CommanderX16
         private void LoadBuild()
         {
             RefreshProfiles();
+            if (editingStartDefaults && HasSavedSettings)
+            {
+                LoadOptions(Profile.Snapshot(savedOptions, Emulator));
+                return;
+            }
             if (preserveUnassignedOptions && Emulator != null)
             {
                 preserveUnassignedOptions = false;
@@ -169,20 +185,25 @@ namespace CommanderX16
             if (profile != null)
                 profiles.SelectedItem = profile;
             else if (Emulator != null)
-                profiles.SelectedItem = "Emulator defaults";
+                profiles.SelectedItem = BuiltInSettingsLabel;
             loading = false;
             LoadOptions(Profile.Snapshot(profile, Emulator));
         }
+
+        private bool HasSavedSettings => savedOptions != null && Emulator?.Id == initialEmulator?.Id;
+        private string SavedSettingsLabel => editingStartDefaults ? "Saved Start settings" : "Saved settings";
+        private string BuiltInSettingsLabel => editingStartDefaults ? "Built-in emulator defaults" : "Emulator defaults";
 
         private void RefreshProfiles()
         {
             loading = true;
             profiles.Items.Clear();
-            if (savedOptions != null && Emulator?.Id == initialEmulator?.Id)
-                profiles.Items.Add("Saved settings");
-            profiles.Items.Add("Emulator defaults");
+            if (HasSavedSettings)
+                profiles.Items.Add(SavedSettingsLabel);
+            profiles.Items.Add(BuiltInSettingsLabel);
             profiles.Items.AddRange(settings.Profiles.Where(profile =>
-                Emulator != null && (profile.EmulatorId == Emulator.Id || profile.DetachedFrom != null))
+                Emulator != null && (profile.EmulatorId == Emulator.Id ||
+                    (!editingStartDefaults && profile.DetachedFrom != null)))
                 .Cast<object>().ToArray());
             profiles.SelectedIndex = 0;
             profiles.Enabled = Emulator != null;
