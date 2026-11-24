@@ -10,22 +10,17 @@ namespace CommanderX16
     internal sealed partial class MainForm
     {
         private readonly TextBox search = Entry();
-        private readonly ListBox startMenu = ProgramList();
-        private readonly ListBox catalog = ProgramList();
+        private readonly ListBox startMenu = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
         private readonly Button startSettings = Button("Launch settings…");
         private int launchAttempt;
         private readonly CheckBox saveGif = new CheckBox { Text = "Save GIF", AutoSize = true };
         private readonly TextBox gifFile = Entry();
         private readonly Button startDefaults = Button("Start defaults…");
         private readonly Label launchConfiguration = new Label { AutoSize = true };
-        private readonly Label programProfile = new Label { AutoSize = true };
-        private readonly TextBox programPath = new TextBox { ReadOnly = true, Dock = DockStyle.Fill };
-        private readonly Button editSettings = Button("Edit PRG…"), duplicate = Button("Duplicate entry…"),
+        private readonly Button duplicate = Button("Duplicate entry…"),
             removeProgram = Button("Remove from list…");
 
-        private static ListBox ProgramList() => new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
-
-        private void BuildProgramPages(TabPage start, TabPage programs, TabControl tabs)
+        private void BuildStartPage(TabPage start, TabControl tabs)
         {
             var startBody = PageBody(start);
             var headline = new Label
@@ -34,11 +29,13 @@ namespace CommanderX16
                 ForeColor = Navy, AutoSize = true
             };
             AddRow(startBody, headline);
-            AddRow(startBody, Pair("Find a PRG", search, Button("Add PRG…", () => AddProgram(true)), startDefaults));
+            AddRow(startBody, Pair("Find a PRG", search, Button("Add PRG…", () =>
+                EditLaunchSettings(new ProgramEntry(), "Add PRG", create: true)), startDefaults));
             startMenu.BackColor = Navy;
             startMenu.ForeColor = Color.White;
             startMenu.Font = new Font("Segoe UI", 13);
             AddRow(startBody, startMenu, SizeType.Percent, 100);
+            AddRow(startBody, Flow(duplicate, removeProgram));
             gifFile.AccessibleName = "GIF output file";
             AddRow(startBody, Pair("", saveGif));
             AddRow(startBody, Pair("File (blank: demo.gif)", gifFile));
@@ -49,15 +46,9 @@ namespace CommanderX16
             run.FlatStyle = FlatStyle.Flat;
             AddRow(startBody, Flow(run, startSettings, copy, launchStatus));
 
-            var registry = PageBody(programs);
-            AddRow(registry, Flow(Button("Add PRG…", () => AddProgram(false)), editSettings, duplicate, removeProgram));
-            AddRow(registry, catalog, SizeType.Percent, 100);
-            AddRow(registry, Pair("Program path", programPath));
-            AddRow(registry, Pair("Emulator", programProfile));
-
             saveGif.CheckedChanged += (sender, args) => RefreshPreview();
             gifFile.TextChanged += (sender, args) => RefreshPreview();
-            search.TextChanged += (sender, args) => BindStart((startMenu.SelectedItem as ProgramEntry)?.Id);
+            search.TextChanged += (sender, args) => RefreshPrograms();
             startMenu.SelectedIndexChanged += (sender, args) => RefreshPreview();
             startMenu.MouseDoubleClick += async (sender, args) =>
             {
@@ -69,19 +60,10 @@ namespace CommanderX16
             startDefaults.Click += (sender, args) => Attempt(EditStartDefaults);
             startSettings.Click += (sender, args) => Attempt(() => EditLaunchSettings(startMenu.SelectedItem as ProgramEntry));
             copy.Click += (sender, args) => Attempt(CopyPreview);
-            catalog.SelectedIndexChanged += (sender, args) => UpdateCatalogDetails();
             removeProgram.Click += (sender, args) => Attempt(RemoveProgram);
-            editSettings.Click += (sender, args) => Attempt(() => EditLaunchSettings(catalog.SelectedItem as ProgramEntry, "Edit PRG"));
             duplicate.Click += (sender, args) => Attempt(DuplicateProgram);
-            TabPage previous = start;
             tabs.SelectedIndexChanged += (sender, args) =>
-            {
                 AcceptButton = tabs.SelectedTab == start ? run : null;
-                ProgramEntry entry = previous == start ? startMenu.SelectedItem as ProgramEntry :
-                    previous == programs ? catalog.SelectedItem as ProgramEntry : null;
-                previous = tabs.SelectedTab;
-                RefreshPrograms(entry?.Id);
-            };
             AcceptButton = run;
             RefreshPrograms();
         }
@@ -95,57 +77,30 @@ namespace CommanderX16
             return body;
         }
 
-        private static void SetPrograms(ListBox list, ProgramEntry[] entries, string id)
+        private void RefreshPrograms(string select = null)
         {
-            list.BeginUpdate();
+            string id = select ?? (startMenu.SelectedItem as ProgramEntry)?.Id;
+            string filter = search.Text.Trim();
+            var entries = store.Data.Programs.Where(p =>
+                p.Name.IndexOf(filter, StringComparison.CurrentCultureIgnoreCase) >= 0 ||
+                p.Path.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
+                .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(p => p.Path, StringComparer.OrdinalIgnoreCase).ToArray();
+            startMenu.BeginUpdate();
             try
             {
-                list.Items.Clear();
-                list.Items.AddRange(entries);
-                SelectById(list, Array.FindIndex(entries, p => p.Id == id));
+                startMenu.Items.Clear();
+                startMenu.Items.AddRange(entries);
+                if (entries.Length > 0)
+                    startMenu.SelectedIndex = Math.Max(0, Array.FindIndex(entries, p => p.Id == id));
             }
-            finally { list.EndUpdate(); }
-        }
-
-        private static void SelectById(ListBox list, int index) =>
-            list.SelectedIndex = list.Items.Count == 0 ? -1 : Math.Max(0, index);
-
-        private ProgramEntry[] SortedPrograms() => store.Data.Programs.OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
-            .ThenBy(p => p.Path, StringComparer.OrdinalIgnoreCase).ToArray();
-
-        private void BindStart(string id)
-        {
-            string filter = search.Text.Trim();
-            SetPrograms(startMenu, SortedPrograms().Where(p =>
-                p.Name.IndexOf(filter, StringComparison.CurrentCultureIgnoreCase) >= 0 ||
-                p.Path.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0).ToArray(), id);
+            finally { startMenu.EndUpdate(); }
             RefreshPreview();
         }
 
-        private void RefreshPrograms(string select = null)
-        {
-            string startId = select ?? (startMenu.SelectedItem as ProgramEntry)?.Id;
-            string catalogId = select ?? (catalog.SelectedItem as ProgramEntry)?.Id;
-            SetPrograms(catalog, SortedPrograms(), catalogId);
-            BindStart(startId);
-            UpdateCatalogDetails();
-        }
-
-        private void UpdateCatalogDetails()
-        {
-            var entry = catalog.SelectedItem as ProgramEntry;
-            programPath.Text = entry?.Path ?? "";
-            programProfile.Text = entry == null ? "" : store.Data.LaunchEmulator(entry)?.Name ??
-                (entry.EmulatorId == null ? "Choose an emulator in Launch settings" : "Registered emulator is missing");
-            editSettings.Enabled = duplicate.Enabled = removeProgram.Enabled = !launching && entry != null;
-        }
-
-        private void AddProgram(bool fromStart) =>
-            Attempt(() => EditLaunchSettings(new ProgramEntry(), "Add PRG", create: true, clearSearch: fromStart));
-
         private void RemoveProgram()
         {
-            var program = (ProgramEntry)catalog.SelectedItem;
+            var program = (ProgramEntry)startMenu.SelectedItem;
             if (MessageBox.Show(this, "Remove " + program.Name + " from the PRG list? The program file will stay on disk.",
                 "Remove PRG", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
                 return;
@@ -155,15 +110,14 @@ namespace CommanderX16
 
         private void DuplicateProgram()
         {
-            var program = (ProgramEntry)catalog.SelectedItem;
+            var program = (ProgramEntry)startMenu.SelectedItem;
             var entry = Json.Read<ProgramEntry>(Json.Write(program));
             entry.Id = Guid.NewGuid().ToString("N");
             entry.Name = program.Name + " (copy)";
             EditLaunchSettings(entry, "Duplicate PRG entry", create: true);
         }
 
-        private void EditLaunchSettings(ProgramEntry program, string title = "Launch settings", bool create = false,
-            bool clearSearch = false)
+        private void EditLaunchSettings(ProgramEntry program, string title = "Launch settings", bool create = false)
         {
             if (program == null) return;
             var emulator = store.Data.LaunchEmulator(program);
@@ -184,7 +138,7 @@ namespace CommanderX16
                     entry.ProfileId = null;
                     if (create) data.Programs.Add(entry);
                 });
-                if (clearSearch) search.Clear();
+                if (create) search.Clear();
                 RefreshPrograms(program.Id);
             }
         }
@@ -231,7 +185,7 @@ namespace CommanderX16
             startDefaults.Enabled = !launching && store.Data.Emulators.Count != 0;
             launchConfiguration.Text = emulator == null ? "Command preview" :
                 (store.Data.UsesStartDefaults(program) ? "Start defaults" : "PRG settings") + " · " + emulator.Name;
-            startSettings.Enabled = !launching && program != null;
+            startSettings.Enabled = duplicate.Enabled = removeProgram.Enabled = !launching && program != null;
             copy.Enabled = false;
             if (program == null) preview.Text = store.Data.Programs.Count == 0 ? "Add a PRG to get started." : "No matching PRGs.";
             else if (store.Data.Emulators.Count == 0) preview.Text = "Register or install an X16Emu build on the Emulators tab.";

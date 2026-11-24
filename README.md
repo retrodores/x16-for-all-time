@@ -2,11 +2,13 @@
 
 A Windows launcher for running a library of Commander X16 programs with your choice of X16Emu build.
 
-## Start and PRGs
+## Start
 
 Double-click an entry or select **Run** to launch it. The entry's saved configuration takes priority. **Start defaults** supplies an emulator and settings for entries without a configuration. The preview identifies the settings in use and **Copy PowerShell** copies the same command. The working directory is always the PRG's containing folder.
 
-**Launch settings** on Start or PRGs edits the same entry. Selecting an emulator fills the form from that build's default profile or emulator defaults. Select a different profile to prefill its values. Save a copy of the resulting configuration or choose **Use Start defaults** to let the entry follow the Start list's defaults. An entry whose emulator was removed requires reassignment.
+Use **Launch settings** to edit the selected PRG's name, path, and launch settings. **Duplicate entry** copies the entry so you can save another setup for the same PRG. **Remove from list** removes the entry and keeps the program file on disk.
+
+Selecting an emulator fills the form from that build's default profile or emulator defaults. Select a different profile to prefill its values. Save a copy of the resulting configuration or choose **Use Start defaults** to let the entry follow the Start list's defaults. An entry whose emulator was removed requires reassignment.
 
 Use **Add PRG** or **Edit PRG** to set the name, path, and launch settings in one dialog. **Duplicate entry** copies those fields into a new entry. **Remove from list** keeps the program file on disk. A relative GIF output path is resolved against the PRG’s folder. On Start, **Save GIF** overrides the recording filename for launches while checked. A blank filename uses demo.gif. The PRG’s saved settings stay intact.
 

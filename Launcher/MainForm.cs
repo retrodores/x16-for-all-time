@@ -51,11 +51,10 @@ namespace CommanderX16
             AddRow(layout, title);
             var pages = new TabControl { Dock = DockStyle.Fill };
             var start = new TabPage("Start") { Padding = new Padding(12) };
-            var programs = new TabPage("PRGs") { Padding = new Padding(12) };
             var emulatorPage = new TabPage("Emulators") { Padding = new Padding(12) };
-            pages.TabPages.AddRange(new[] { start, programs, emulatorPage });
+            pages.TabPages.AddRange(new[] { start, emulatorPage });
             AddRow(layout, pages, SizeType.Percent, 100);
-            BuildProgramPages(start, programs, pages);
+            BuildStartPage(start, pages);
 
             var emulatorBody = Table();
             emulatorBody.AutoSize = false;
