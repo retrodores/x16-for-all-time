@@ -56,11 +56,6 @@ namespace CommanderX16
             var about = Button("&About…", () => Attempt(ShowAbout));
             about.Anchor = AnchorStyles.Right;
             header.Controls.Add(about, 1, 0);
-            header.Controls.Add(new Label
-            {
-                Text = Program.Tagline, AutoSize = true, ForeColor = Navy,
-                Margin = new Padding(0, 0, 0, 10)
-            }, 0, 1);
             AddRow(layout, header);
             var pages = new TabControl { Dock = DockStyle.Fill };
             var start = new TabPage("Start") { Padding = new Padding(12) };
@@ -356,7 +351,6 @@ namespace CommanderX16
                 }, 0, 0);
                 var name = Table();
                 AddRow(name, new Label { Text = Program.Title, Font = headingFont, AutoSize = true, ForeColor = Navy });
-                AddRow(name, new Label { Text = Program.Tagline, AutoSize = true, ForeColor = Navy });
                 AddRow(name, new Label { Text = "Version " + assembly.GetName().Version.ToString(3), AutoSize = true });
                 identity.Controls.Add(name, 1, 0);
                 AddRow(body, identity);

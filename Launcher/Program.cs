@@ -7,7 +7,6 @@ namespace CommanderX16
     internal static class Program
     {
         internal const string Title = "X16 For All Time";
-        internal const string Tagline = "For Now, not Forever";
 
         [STAThread]
         private static void Main()
