@@ -293,6 +293,7 @@ namespace CommanderX16
         [DataMember] public string WorkingDirectory;
         [DataMember] public Release Release;
         [DataMember] public string Destination;
+        [DataMember(EmitDefaultValue = false)] public string Url;
         [DataMember] public bool Overwrite;
     }
 

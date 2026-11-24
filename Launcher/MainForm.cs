@@ -60,9 +60,11 @@ namespace CommanderX16
             var pages = new TabControl { Dock = DockStyle.Fill };
             var start = new TabPage("Start") { Padding = new Padding(12) };
             var emulatorPage = new TabPage("Emulators") { Padding = new Padding(12) };
-            pages.TabPages.AddRange(new[] { start, emulatorPage });
+            var catalogPage = new TabPage("X16 Files") { Padding = new Padding(12) };
+            pages.TabPages.AddRange(new[] { start, emulatorPage, catalogPage });
             AddRow(layout, pages, SizeType.Percent, 100);
             BuildStartPage(start, pages);
+            BuildCatalogPage(catalogPage, pages);
 
             var emulatorBody = Table();
             emulatorBody.AutoSize = false;
@@ -95,7 +97,7 @@ namespace CommanderX16
             duplicateProfile.Click += (sender, args) => Attempt(() => SaveProfile(SelectedProfile, true));
             deleteProfile.Click += (sender, args) => Attempt(RemoveProfile);
             defaultProfile.Click += (sender, args) => Attempt(SetDefaultProfile);
-            FormClosing += (sender, args) => { if (launching) args.Cancel = true; };
+            FormClosing += (sender, args) => { if (launching || catalogBusy) args.Cancel = true; };
             BindEmulators(null, null);
         }
 

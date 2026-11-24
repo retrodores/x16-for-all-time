@@ -7,9 +7,11 @@ namespace CommanderX16
 {
     internal static class PowerShell
     {
-        public static Task<Result> Execute(Request request, IProgress<string> progress = null) => Task.Run(() => Run(request, progress));
+        public static Task<Result> Execute(Request request, IProgress<string> progress = null) => Execute<Result>(request, progress);
 
-        private static Result Run(Request request, IProgress<string> progress)
+        public static Task<T> Execute<T>(Request request, IProgress<string> progress = null) => Task.Run(() => Run<T>(request, progress));
+
+        private static T Run<T>(Request request, IProgress<string> progress)
         {
             string script = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "X16.ps1");
             string shell = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
@@ -50,7 +52,7 @@ namespace CommanderX16
                             (errors.IsCompleted ? errors.GetAwaiter().GetResult() : null);
                         throw new IOException(string.IsNullOrWhiteSpace(error) ? "Windows PowerShell could not complete the operation." : error.Trim());
                     }
-                    return Json.Read<Result>(File.ReadAllBytes(resultFile));
+                    return Json.Read<T>(File.ReadAllBytes(resultFile));
                 }
             }
             finally

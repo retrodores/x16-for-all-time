@@ -29,6 +29,13 @@ function Show-Stage([string]$Stage) {
     [Console]::WriteLine("X16-STAGE:$Stage")
 }
 
+function Download-X16File([uri]$Uri, [string]$Destination, [int]$Timeout) {
+    if ($Uri.Scheme -notin @('https', 'http') -or !$Uri.Host -or $Uri.UserInfo) {
+        throw 'The download requires an HTTP or HTTPS URL without credentials.'
+    }
+    Invoke-WebRequest -UseBasicParsing -TimeoutSec $Timeout -Uri $Uri -OutFile $Destination
+}
+
 function Install-X16Release($Release, [string]$Destination, [bool]$Overwrite) {
     $uri = [uri]$Release.Url
     if ($uri.Scheme -ne 'https' -or $uri.Host -ne 'github.com' -or
@@ -53,7 +60,7 @@ function Install-X16Release($Release, [string]$Destination, [bool]$Overwrite) {
         $zip = Join-Path $stage 'release.zip'
         $files = Join-Path $stage 'files'
         Show-Stage "Downloading $($Release.Tag)..."
-        Invoke-WebRequest -UseBasicParsing -TimeoutSec 120 -Uri $uri -OutFile $zip
+        Download-X16File $uri $zip 120
         $step = 'Checksum verification'
         Show-Stage "Verifying $($Release.Tag)..."
         if ($Release.Digest) {
@@ -105,7 +112,12 @@ function Install-X16Release($Release, [string]$Destination, [bool]$Overwrite) {
 
 try {
     $request = [IO.File]::ReadAllText($RequestFile, $utf8) | ConvertFrom-Json
+    if ($request.Action -eq 'Catalog') {
+        Download-X16File 'https://x16files.com/directory/data/launcher.json' $ResultFile 30
+        exit 0
+    }
     $result = switch ($request.Action) {
+        'Download' { Download-X16File $request.Url $request.Destination 120; @{} }
         'List' { @{ Releases = @(Get-X16Releases) } }
         'Install' { Install-X16Release $request.Release $request.Destination $request.Overwrite }
         default { throw 'Unknown launcher operation.' }

@@ -12,6 +12,10 @@ Selecting an emulator fills the form from that build's default profile or emulat
 
 Use **Add PRG** or **Edit PRG** to set the name, path, and launch settings in one dialog. **Duplicate entry** copies those fields into a new entry. **Remove from list** keeps the program file on disk. A relative GIF output path is resolved against the PRG’s folder. On Start, **Save GIF** overrides the recording filename for launches while checked. A blank filename uses demo.gif. The PRG’s saved settings stay intact.
 
+## X16 Files
+
+Browse the X16 Files catalog, open a project page, or choose **Download and launch** for a verified package. The launcher stores each download beneath its catalog program ID and keeps the entire ZIP together. Catalog launches use Start defaults, or the default profile of the sole registered emulator, with **Run after loading** enabled.
+
 ## Emulators and profiles
 
 Use **Register existing** for an unpacked folder or executable, including renamed builds. **Install or update** installs official Windows releases side by side. **Edit emulator** updates the build name, executable path, and whether standard X16Emu options are supported. ROM and extra arguments are set in the build’s profile. For the serial-network fork, use its compatible ROM and DLLs and enter -serialcard in the profile’s Extra arguments.

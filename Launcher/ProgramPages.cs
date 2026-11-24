@@ -183,6 +183,7 @@ namespace CommanderX16
         {
             var program = startMenu.SelectedItem as ProgramEntry;
             var emulator = program == null ? null : store.Data.LaunchEmulator(program);
+            UpdateCatalogSelection();
             run.Enabled = false;
             run.Text = program != null && store.Data.LaunchOptions(program).AutoRun ? "Run PRG" : "Load PRG";
             saveGif.Enabled = !launching && program != null;
@@ -243,14 +244,7 @@ namespace CommanderX16
                 copy.Enabled = false;
                 launchStatus.Text = "Starting emulator…";
                 launchActivity.Show();
-                int attempt = ++launchAttempt;
-                string lateError = null;
-                await EmulatorProcess.Start(request, new Progress<string>(message =>
-                {
-                    lateError = message;
-                    if (attempt == launchAttempt && !IsDisposed) launchStatus.Text = message;
-                }));
-                if (lateError == null) launchStatus.Text = "Emulator launched";
+                await StartPreparedProgram(request, message => launchStatus.Text = message);
             }
             catch (Exception error)
             {
@@ -265,6 +259,18 @@ namespace CommanderX16
                 launchActivity.Hide();
                 RefreshPreview();
             }
+        }
+
+        private async Task StartPreparedProgram(Request request, Action<string> report)
+        {
+            int attempt = ++launchAttempt;
+            string lateError = null;
+            await EmulatorProcess.Start(request, new Progress<string>(message =>
+            {
+                lateError = message;
+                if (attempt == launchAttempt && !IsDisposed) report(message);
+            }));
+            if (lateError == null) report("Emulator launched");
         }
     }
 }
