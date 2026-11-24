@@ -1,10 +1,13 @@
 using System;
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace CommanderX16
 {
     internal static class Program
     {
+        internal const string Title = "Commander X16 For Right Now";
+
         [STAThread]
         private static void Main()
         {
@@ -13,11 +16,16 @@ namespace CommanderX16
             try
             {
                 using (var store = new SettingsStore(SettingsStore.Home))
-                    Application.Run(new MainForm(store));
+                using (var icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath))
+                using (var window = new MainForm(store))
+                {
+                    window.Icon = icon;
+                    Application.Run(window);
+                }
             }
             catch (Exception error)
             {
-                MessageBox.Show(error.Message, "Commander X16 For Right Now", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(error.Message, Title, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

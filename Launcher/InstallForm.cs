@@ -15,7 +15,11 @@ namespace CommanderX16
         private readonly TextBox parent = Entry(), folderName = Entry();
         private readonly TextBox destination = new TextBox { ReadOnly = true, Dock = DockStyle.Fill };
         private readonly CheckBox overwrite = new CheckBox { Text = "Overwrite existing installation", AutoSize = true };
-        private readonly ProgressBar activity = new ProgressBar { Dock = DockStyle.Fill, Style = ProgressBarStyle.Marquee, Visible = false };
+        private readonly ProgressBar activity = new ProgressBar
+        {
+            Dock = DockStyle.Top, Height = 16, Style = ProgressBarStyle.Marquee, Visible = false,
+            MarqueeAnimationSpeed = 25, AccessibleName = "Emulator installer activity"
+        };
         private readonly Label status = new Label { AutoSize = true, MaximumSize = new Size(600, 0) };
         private readonly Button install = Button("Install"), refresh = Button("Check for versions");
         private readonly TableLayoutPanel body = Table();

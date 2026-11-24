@@ -10,6 +10,7 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\Assets\retrodores.ico</ApplicationIcon>
     <Optimize Condition="'$(Configuration)' == 'Release'">true</Optimize>
     <Deterministic>true</Deterministic>
   </PropertyGroup>
@@ -22,6 +23,9 @@
     <Reference Include="System.Xml" />
     <Compile Include="*.cs" />
     <None Include="app.config" />
+    <EmbeddedResource Include="..\Assets\retrodores.png">
+      <LogicalName>CommanderX16.Retrodores.png</LogicalName>
+    </EmbeddedResource>
     <Content Include="..\Scripts\X16.ps1">
       <Link>X16.ps1</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

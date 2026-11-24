@@ -27,7 +27,7 @@ namespace CommanderX16
         public MainForm(SettingsStore store)
         {
             this.store = store;
-            Text = "Commander X16 For Right Now";
+            Text = Program.Title;
             Font = new Font("Segoe UI", 10);
             AutoScaleMode = AutoScaleMode.Dpi;
             MinimumSize = new Size(700, 630);
@@ -48,7 +48,15 @@ namespace CommanderX16
                 Text = Text, Font = new Font("Segoe UI Semibold", 20),
                 AutoSize = true, ForeColor = Navy, Margin = new Padding(0, 0, 0, 10)
             };
-            AddRow(layout, title);
+            var header = Table();
+            header.ColumnCount = 2;
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            header.Controls.Add(title, 0, 0);
+            var about = Button("&About…", () => Attempt(ShowAbout));
+            about.Anchor = AnchorStyles.Right;
+            header.Controls.Add(about, 1, 0);
+            AddRow(layout, header);
             var pages = new TabControl { Dock = DockStyle.Fill };
             var start = new TabPage("Start") { Padding = new Padding(12) };
             var emulatorPage = new TabPage("Emulators") { Padding = new Padding(12) };
@@ -309,6 +317,71 @@ namespace CommanderX16
                 RefreshPrograms();
                 status.Text = "Release installed";
             }
+        }
+
+        private void ShowAbout()
+        {
+            var assembly = typeof(MainForm).Assembly;
+            using (var artwork = assembly.GetManifestResourceStream("CommanderX16.Retrodores.png"))
+            using (var image = Image.FromStream(artwork))
+            using (var headingFont = new Font(Font.FontFamily, 17, FontStyle.Bold))
+            using (var sectionFont = new Font(Font, FontStyle.Bold))
+            using (var dialog = new Form
+            {
+                Text = "About " + Program.Title, Font = Font, Icon = Icon,
+                AutoScaleMode = AutoScaleMode.Dpi, ClientSize = new Size(560, 310),
+                StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false, MinimizeBox = false, ShowInTaskbar = false
+            })
+            {
+                var body = Table();
+                body.AutoSize = false;
+                body.Dock = DockStyle.Fill;
+                body.Padding = new Padding(16);
+                body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+                dialog.Controls.Add(body);
+                var identity = Table();
+                identity.ColumnCount = 2;
+                identity.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+                identity.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+                identity.Margin = new Padding(0, 0, 0, 12);
+                identity.Controls.Add(new PictureBox
+                {
+                    Image = image, SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(72, 72),
+                    Margin = new Padding(0, 0, 14, 0), AccessibleName = "Retrodores avatar"
+                }, 0, 0);
+                var name = Table();
+                AddRow(name, new Label { Text = Program.Title, Font = headingFont, AutoSize = true, ForeColor = Navy });
+                AddRow(name, new Label { Text = "Version " + assembly.GetName().Version.ToString(3), AutoSize = true });
+                identity.Controls.Add(name, 1, 0);
+                AddRow(body, identity);
+                AddRow(body, new Label
+                {
+                    Text = "A Windows launcher for Commander X16 programs.",
+                    AutoSize = true, Margin = new Padding(0, 0, 0, 12)
+                });
+                AddRow(body, new Label { Text = "Project and credits", Font = sectionFont, AutoSize = true });
+                AddRow(body, AboutLink("Source and releases", "https://github.com/retrodores/x16-right-now"));
+                AddRow(body, AboutLink("Retrodores on GitHub", "https://github.com/retrodores"));
+                AddRow(body, AboutLink("Commander X16 emulator", "https://github.com/X16Community/x16-emulator"));
+                AddRow(body, new Panel(), SizeType.Percent, 100);
+                var close = Button("Close");
+                close.DialogResult = DialogResult.OK;
+                close.Anchor = AnchorStyles.Right;
+                close.Margin = new Padding(0, 12, 0, 0);
+                AddRow(body, close);
+                dialog.AcceptButton = dialog.CancelButton = close;
+                dialog.ActiveControl = close;
+                dialog.ShowDialog(this);
+            }
+        }
+
+        private LinkLabel AboutLink(string text, string url)
+        {
+            var link = new LinkLabel { Text = text, AutoSize = true };
+            link.LinkClicked += (sender, args) => Attempt(() => System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }));
+            return link;
         }
 
         private void Attempt(Action action)

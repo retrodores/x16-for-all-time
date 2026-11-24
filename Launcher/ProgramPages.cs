@@ -12,6 +12,11 @@ namespace CommanderX16
         private readonly TextBox search = Entry();
         private readonly ListBox startMenu = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
         private readonly Button startSettings = Button("Launch settings…");
+        private readonly ProgressBar launchActivity = new ProgressBar
+        {
+            Size = new Size(86, 16), Margin = new Padding(4, 7, 4, 0), Style = ProgressBarStyle.Marquee,
+            MarqueeAnimationSpeed = 25, Visible = false, AccessibleName = "Emulator launch activity"
+        };
         private int launchAttempt;
         private readonly CheckBox saveGif = new CheckBox { Text = "Save GIF", AutoSize = true };
         private readonly TextBox gifFile = Entry();
@@ -44,7 +49,7 @@ namespace CommanderX16
             run.BackColor = Teal;
             run.ForeColor = Color.White;
             run.FlatStyle = FlatStyle.Flat;
-            AddRow(startBody, Flow(run, startSettings, copy, launchStatus));
+            AddRow(startBody, Flow(run, startSettings, copy, launchActivity, launchStatus));
 
             saveGif.CheckedChanged += (sender, args) => RefreshPreview();
             gifFile.TextChanged += (sender, args) => RefreshPreview();
@@ -236,7 +241,8 @@ namespace CommanderX16
                 RefreshPreview();
                 preview.Text = CommandPreview(request);
                 copy.Enabled = false;
-                launchStatus.Text = "Starting…";
+                launchStatus.Text = "Starting emulator…";
+                launchActivity.Show();
                 int attempt = ++launchAttempt;
                 string lateError = null;
                 await EmulatorProcess.Start(request, new Progress<string>(message =>
@@ -248,6 +254,7 @@ namespace CommanderX16
             }
             catch (Exception error)
             {
+                launchActivity.Hide();
                 launchStatus.Text = "Launch failed";
                 string details = error.Message + (request == null ? "" : Environment.NewLine + Environment.NewLine + CommandPreview(request));
                 MessageBox.Show(this, details, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -255,6 +262,7 @@ namespace CommanderX16
             finally
             {
                 launching = false;
+                launchActivity.Hide();
                 RefreshPreview();
             }
         }

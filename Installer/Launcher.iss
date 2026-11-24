@@ -1,11 +1,13 @@
 #define AppName "Commander X16 For Right Now"
-#define AppVersion "0.7.1"
+#define AppVersion "0.7.2"
 #define BinDir "..\Launcher\bin\Release"
 
 [Setup]
 AppId=CommanderX16ForRightNow
 AppName={#AppName}
 AppVersion={#AppVersion}
+AppPublisher=Retrodores
+AppPublisherURL=https://github.com/retrodores/x16-right-now
 DefaultDirName={localappdata}\Programs\CommanderX16ForRightNow
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
@@ -17,6 +19,9 @@ OutputBaseFilename=CommanderX16ForRightNow-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=..\Assets\retrodores.ico
+WizardImageFile=..\Assets\retrodores-wizard.bmp
+WizardSmallImageFile=..\Assets\retrodores-wizard-small.bmp
 UninstallDisplayIcon={app}\CommanderX16ForRightNow.exe
 
 [Files]
