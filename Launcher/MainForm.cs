@@ -61,7 +61,7 @@ namespace CommanderX16
             var start = new TabPage("Start") { Padding = new Padding(12) };
             var emulatorPage = new TabPage("Emulators") { Padding = new Padding(12) };
             var catalogPage = new TabPage("X16 Files") { Padding = new Padding(12) };
-            pages.TabPages.AddRange(new[] { start, emulatorPage, catalogPage });
+            pages.TabPages.AddRange(new[] { start, catalogPage, emulatorPage });
             AddRow(layout, pages, SizeType.Percent, 100);
             BuildStartPage(start, pages);
             BuildCatalogPage(catalogPage, pages, start);
