@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using static CommanderX16.MainForm;
 
@@ -36,6 +37,8 @@ namespace CommanderX16
         private Profile options;
         private bool loading;
         private bool preserveUnassignedOptions;
+        private bool importingProgram;
+        private string importedDirectory;
 
         public Emulator Emulator => builds.SelectedItem as Emulator;
         public Profile Options { get; private set; }
@@ -78,6 +81,7 @@ namespace CommanderX16
                 prgPath.Text = program.Path ?? "";
                 startDefaults.Checked = settings.UsesStartDefaults(program);
                 AddRow(body, Pair("Program file", prgPath, Button("Browse…", PickProgram)));
+                Disposed += (sender, args) => DeleteImport(importedDirectory);
                 AddRow(body, Pair("Configuration", startDefaults));
             }
             AddRow(launchFields, Pair("Emulator", builds));
@@ -253,14 +257,77 @@ namespace CommanderX16
             UpdatePreview();
         }
 
-        private void PickProgram()
+        private async void PickProgram()
         {
-            using (var dialog = new OpenFileDialog { Filter = "Commander X16 program (*.prg)|*.prg" })
+            if (importingProgram) return;
+            string path;
+            using (var dialog = new OpenFileDialog
+            {
+                Filter = "Commander X16 programs (*.prg;*.zip)|*.prg;*.zip"
+            })
             {
                 if (dialog.ShowDialog(this) != DialogResult.OK) return;
-                prgPath.Text = dialog.FileName;
-                if (EntryName.Length == 0) name.Text = Path.GetFileNameWithoutExtension(dialog.FileName);
+                path = dialog.FileName;
             }
+
+            await SelectProgramFile(path);
+        }
+
+        private async Task SelectProgramFile(string path)
+        {
+            string extracted = null;
+            try
+            {
+                if (string.Equals(Path.GetExtension(path), ".zip", StringComparison.OrdinalIgnoreCase))
+                {
+                    importingProgram = true;
+                    confirm.Enabled = false;
+                    preview.Text = "Extracting ZIP…";
+                    extracted = Path.Combine(SettingsStore.Home, "LocalPrograms", Guid.NewGuid().ToString("N"));
+                    string[] candidates = await Task.Run(() => Catalog.ExtractCandidates(path, extracted, null));
+                    if (IsDisposed) return;
+                    int selected = candidates.Length == 1 ? 0 :
+                        LauncherDialogs.SelectItem(this, "Choose the startup PRG", candidates);
+                    if (selected < 0) return;
+                    path = Path.Combine(extracted, candidates[selected]);
+                }
+
+                if (!IsImportedProgram(path))
+                {
+                    DeleteImport(importedDirectory);
+                    importedDirectory = extracted;
+                    extracted = null;
+                }
+                prgPath.Text = path;
+                if (EntryName.Length == 0) name.Text = Path.GetFileNameWithoutExtension(path);
+            }
+            catch (Exception error)
+            {
+                if (!IsDisposed) LauncherDialogs.Message(this, error.Message, "Add program");
+            }
+            finally
+            {
+                DeleteImport(extracted);
+                importingProgram = false;
+                if (!IsDisposed) UpdatePreview();
+            }
+        }
+
+        internal void KeepImportedProgram()
+        {
+            if (IsImportedProgram(ProgramPath)) importedDirectory = null;
+        }
+
+        private bool IsImportedProgram(string path) =>
+            importedDirectory != null &&
+            path.StartsWith(importedDirectory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+
+        private static void DeleteImport(string directory)
+        {
+            if (directory == null || !Directory.Exists(directory)) return;
+            try { Directory.Delete(directory, true); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
         }
 
         private void PickRom()
@@ -298,7 +365,7 @@ namespace CommanderX16
 
         private void UpdatePreview()
         {
-            if (loading) return;
+            if (loading || importingProgram) return;
             confirm.Enabled = false;
             try
             {

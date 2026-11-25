@@ -22,6 +22,45 @@ namespace CommanderX16
         internal static bool OfferBrowser(Form owner, string message, string title) =>
             ShowMessage(owner, message, title, "&Open in browser", "Close") == DialogResult.Yes;
 
+        internal static int SelectItem(Form owner, string title, string[] items)
+        {
+            using (var dialog = new Form
+            {
+                Text = title, Font = owner.Font, ClientSize = new Size(640, 300), AutoScaleMode = AutoScaleMode.Dpi,
+                StartPosition = FormStartPosition.CenterParent, ShowInTaskbar = false,
+                MinimizeBox = false
+            })
+            {
+                var body = Table();
+                body.Dock = DockStyle.Fill;
+                body.AutoSize = false;
+                body.Padding = new Padding(12);
+                dialog.Controls.Add(body);
+                var list = new ListBox
+                {
+                    Dock = DockStyle.Fill, HorizontalScrollbar = true, IntegralHeight = false,
+                    AccessibleName = title
+                };
+                list.Items.AddRange(items);
+                list.SelectedIndex = 0;
+                var select = Button("Select");
+                select.DialogResult = DialogResult.OK;
+                var cancel = Button("Cancel");
+                cancel.DialogResult = DialogResult.Cancel;
+                dialog.AcceptButton = select;
+                dialog.CancelButton = cancel;
+                list.DoubleClick += (sender, args) =>
+                {
+                    if (list.IndexFromPoint(list.PointToClient(Cursor.Position)) >= 0)
+                        dialog.DialogResult = DialogResult.OK;
+                };
+                AddRow(body, list, SizeType.Percent, 100);
+                AddRow(body, Flow(select, cancel));
+                dialog.ActiveControl = list;
+                return Show(dialog, owner) == DialogResult.OK ? list.SelectedIndex : -1;
+            }
+        }
+
         private static DialogResult ShowMessage(Form owner, string message, string title,
             string acceptText = null, string closeText = "OK")
         {

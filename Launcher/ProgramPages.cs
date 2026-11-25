@@ -171,6 +171,7 @@ namespace CommanderX16
                     entry.ProfileId = null;
                     if (create) data.Programs.Add(entry);
                 });
+                dialog.KeepImportedProgram();
                 if (create) search.Clear();
                 RefreshPrograms(program.Id);
             }
