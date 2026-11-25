@@ -55,6 +55,7 @@ namespace CommanderX16
             gifFile.TextChanged += (sender, args) => RefreshPreview();
             search.TextChanged += (sender, args) => RefreshPrograms();
             startMenu.SelectedIndexChanged += (sender, args) => RefreshPreview();
+            BuildStartContextMenu();
             startMenu.MouseDoubleClick += async (sender, args) =>
             {
                 if (args.Button != MouseButtons.Left) return;
@@ -71,6 +72,31 @@ namespace CommanderX16
                 AcceptButton = tabs.SelectedTab == start ? run : null;
             AcceptButton = run;
             RefreshPrograms();
+        }
+
+        private void BuildStartContextMenu()
+        {
+            var contextMenu = new ContextMenuStrip();
+            var actions = new[] { run, startSettings, copy, duplicate, removeProgram };
+            var items = actions.Select(button =>
+                new ToolStripMenuItem(button.Text, null, (sender, args) => button.PerformClick())).ToArray();
+            contextMenu.Items.AddRange(items);
+            contextMenu.Opening += (sender, args) =>
+            {
+                args.Cancel = startMenu.SelectedItem == null;
+                for (int i = 0; i < actions.Length; i++)
+                {
+                    items[i].Text = actions[i].Text;
+                    items[i].Enabled = actions[i].Enabled;
+                }
+            };
+            startMenu.ContextMenuStrip = contextMenu;
+            startMenu.MouseDown += (sender, args) =>
+            {
+                if (args.Button == MouseButtons.Right)
+                    startMenu.SelectedIndex = startMenu.IndexFromPoint(args.Location);
+            };
+            startMenu.Disposed += (sender, args) => contextMenu.Dispose();
         }
 
         private static TableLayoutPanel PageBody(TabPage page)

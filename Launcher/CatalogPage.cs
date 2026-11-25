@@ -12,6 +12,7 @@ namespace CommanderX16
     {
         private readonly TextBox catalogSearch = Entry();
         private readonly CheckBox downloadableOnly = new CheckBox { Text = "Downloadable only", AutoSize = true };
+        private readonly Label catalogCount = new Label { AutoSize = true, Margin = new Padding(12, 4, 3, 3) };
         private readonly ListBox catalogList = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
         private readonly TextBox catalogDetails = new TextBox
         {
@@ -40,7 +41,7 @@ namespace CommanderX16
             catalogSearch.AccessibleName = "Find a catalog program";
             catalogList.AccessibleName = "X16 Files programs";
             AddRow(body, Pair("Find a program", catalogSearch, refreshCatalog));
-            AddRow(body, downloadableOnly);
+            AddRow(body, Flow(downloadableOnly, catalogCount));
             AddRow(body, catalogList, SizeType.Percent, 100);
             AddRow(body, catalogDetails, SizeType.Absolute, 112);
             AddRow(body, Flow(openProject, installProgram, downloadProgram, catalogActivity));
@@ -55,6 +56,14 @@ namespace CommanderX16
             catalogSearch.TextChanged += (sender, args) => ShowCatalogPrograms();
             downloadableOnly.CheckedChanged += (sender, args) => ShowCatalogPrograms();
             catalogList.SelectedIndexChanged += (sender, args) => UpdateCatalogSelection();
+            catalogList.MouseDoubleClick += (sender, args) =>
+            {
+                if (args.Button != MouseButtons.Left) return;
+                int index = catalogList.IndexFromPoint(args.Location);
+                if (index < 0) return;
+                catalogList.SelectedIndex = index;
+                installProgram.PerformClick();
+            };
             openProject.Click += (sender, args) => Attempt(() =>
             {
                 var program = (CatalogProgram)catalogList.SelectedItem;
@@ -80,7 +89,7 @@ namespace CommanderX16
             {
                 catalogPrograms = await Catalog.Fetch();
                 ShowCatalogPrograms();
-                catalogStatus.Text = catalogPrograms.Length + " programs loaded from X16 Files.";
+                catalogStatus.Text = "";
             }
             catch (Exception error)
             {
@@ -104,6 +113,9 @@ namespace CommanderX16
                     .Any(value => value?.IndexOf(filter, StringComparison.CurrentCultureIgnoreCase) >= 0))
                 .OrderBy(program => program.ToString(), StringComparer.CurrentCultureIgnoreCase)
                 .ThenBy(program => program.Id, StringComparer.Ordinal).ToArray();
+            catalogCount.Text = entries.Length == catalogPrograms.Length
+                ? $"{entries.Length:N0} {(entries.Length == 1 ? "program" : "programs")}"
+                : $"{entries.Length:N0} of {catalogPrograms.Length:N0} programs";
             catalogList.BeginUpdate();
             try
             {

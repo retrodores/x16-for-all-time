@@ -22,7 +22,7 @@ Browse the X16 Files catalog, open a project page, or choose **Install to Start*
 
 Use **Register existing** for an unpacked folder or executable, including renamed builds. **Install or update** installs official Windows releases side by side. **Edit emulator** updates the build name, executable path, and whether standard X16Emu options are supported. ROM and extra arguments are set in the build’s profile. For the serial-network fork, use its compatible ROM and DLLs and enter -serialcard in the profile’s Extra arguments.
 
-Each build starts with a **Default** profile and can have additional named profiles with **New profile**, **Edit**, **Duplicate**, **Delete**, and **Set as default**. Profiles prefill PRG settings and Start defaults. Saving either makes an independent copy, including the effective ROM and extra arguments. The standard controls show Commander X16 hardware choices. **Advanced hardware** contains 65C816 emulation and custom clock and RAM values. Display scaling is available in the same editor.
+Each build starts with a **Default** profile and can have additional named profiles with **New profile**, **Edit**, **Duplicate**, **Delete**, and **Set as default**. Profiles prefill PRG settings and Start defaults. Saving either makes an independent copy, including the effective ROM and extra arguments. The standard controls show Commander X16 hardware choices. **CPU** offers 65C02 and 65C816. **Advanced hardware** contains custom clock and RAM values. Display scaling is available in the same editor.
 
 **Remove from list** removes a registration and keeps its files on disk. PRGs referring to the build keep their options and ask for a new emulator. Profiles from removed builds remain available to copy.
 

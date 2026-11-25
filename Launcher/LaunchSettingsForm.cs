@@ -19,7 +19,7 @@ namespace CommanderX16
         private readonly Profile savedOptions;
         private readonly bool editingStartDefaults;
         private readonly ComboBox builds = Combo(), profiles = Combo();
-        private readonly ComboBox cpu = OptionsFor(HardwareOptions.Cpu, value => "65C02");
+        private readonly ComboBox cpu = OptionsFor(HardwareOptions.Cpu, value => value == "-c816" ? "65C816" : "65C02");
         private readonly ComboBox mhz = OptionsFor(HardwareOptions.Clock,
             value => value + " MHz" + (value == "8" ? " (standard)" : ""));
         private readonly ComboBox ram = OptionsFor(HardwareOptions.Ram, value =>
@@ -28,7 +28,6 @@ namespace CommanderX16
         private readonly TextBox gif = Entry(), extra = Entry(), rom = Entry(), sd = Entry(), fs = Entry();
         private readonly TextBox advancedClock = Entry(), advancedRam = Entry();
         private readonly CheckBox advanced = new CheckBox { Text = "Advanced hardware", AutoSize = true };
-        private readonly CheckBox cpu816 = new CheckBox { Text = "65C816 emulation", AutoSize = true };
         private readonly CheckBox fullscreen = new CheckBox { Text = "Fullscreen", AutoSize = true };
         private readonly CheckBox autorun = new CheckBox { Text = "Run after loading", AutoSize = true };
         private readonly TableLayoutPanel hardware = Table(), advancedFields = Table();
@@ -88,7 +87,6 @@ namespace CommanderX16
             AddRow(hardware, Pair("Clock", mhz));
             AddRow(hardware, Pair("Banked RAM", ram));
             AddRow(hardware, advanced);
-            AddRow(advancedFields, Pair("CPU override", cpu816));
             AddRow(advancedFields, Pair("Clock override (MHz)", advancedClock));
             AddRow(advancedFields, Pair("RAM override (KiB)", advancedRam));
             AddRow(hardware, advancedFields);
@@ -150,7 +148,7 @@ namespace CommanderX16
                 box.SelectedIndexChanged += (sender, args) => UpdatePreview();
             foreach (var box in new[] { gif, extra, rom, sd, fs, advancedClock, advancedRam })
                 box.TextChanged += (sender, args) => UpdatePreview();
-            foreach (var box in new[] { fullscreen, autorun, cpu816 })
+            foreach (var box in new[] { fullscreen, autorun })
                 box.CheckedChanged += (sender, args) => UpdatePreview();
             advanced.CheckedChanged += (sender, args) =>
             {
@@ -240,7 +238,6 @@ namespace CommanderX16
             SelectValue(mhz, source.Mhz);
             SelectValue(ram, source.Ram);
             SelectValue(scale, source.Scale);
-            cpu816.Checked = source.Cpu == "-c816";
             advancedClock.Text = HardwareOptions.Clock.Contains(source.Mhz) ? "" : source.Mhz ?? "";
             advancedRam.Text = HardwareOptions.Ram.Contains(source.Ram) ? "" : source.Ram ?? "";
             advanced.Checked = HardwareOptions.NeedsAdvanced(source);
@@ -284,7 +281,7 @@ namespace CommanderX16
 
         private void ReadOptions()
         {
-            options.Cpu = advanced.Checked && cpu816.Checked ? "-c816" : Value(cpu);
+            options.Cpu = Value(cpu);
             options.Mhz = advanced.Checked && advancedClock.Text.Trim().Length != 0
                 ? advancedClock.Text.Trim() : Value(mhz);
             options.Ram = advanced.Checked && advancedRam.Text.Trim().Length != 0
