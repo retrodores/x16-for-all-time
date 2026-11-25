@@ -33,3 +33,7 @@ Use a Visual Studio Developer PowerShell with the .NET Framework 4.8 targeting p
 ## Installing and removing emulators
 
 The installer shows progress while checking releases, downloading, verifying, extracting and installing. **Overwrite existing installation** permanently deletes the previous emulator folder after the replacement is installed and registered. If replacement or registration fails, the launcher attempts to restore the original folder. Existing registrations keep their profiles and PRG assignments. **Remove from list** leaves files on disk unless you choose **Also delete the emulator directory and its contents**. PRG entries and their settings can be edited before an emulator is available.
+
+## Contributing
+
+AI agent-led contributions are preferred. Read the project guidance before starting work. [CONTRIBUTORS.md](CONTRIBUTORS.md)
