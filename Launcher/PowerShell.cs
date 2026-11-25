@@ -56,7 +56,7 @@ namespace CommanderX16
                     process.BeginOutputReadLine();
                     Task<string> errors = process.StandardError.ReadToEndAsync();
                     process.WaitForExit(-1);
-                    if (process.ExitCode == 3 && request.Action == "Download")
+                    if (process.ExitCode == 3 && (request.Action == "Download" || request.Action == "SdCardArchive"))
                         throw new DownloadForbiddenException(request.Url);
                     if (process.ExitCode != 0)
                     {

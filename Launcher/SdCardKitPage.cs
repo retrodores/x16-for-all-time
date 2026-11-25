@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.Linq;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -16,11 +17,14 @@ namespace CommanderX16
         private const string KitRoot = "sdcard_root";
         private readonly TreeView kitTree = new TreeView { Dock = DockStyle.Fill, HideSelection = false, AccessibleName = "SD Card Kit folders and files" };
         private readonly TextBox kitSearch = Entry();
-        private readonly Label kitStatus = new Label { AutoSize = true };
-        private readonly Label kitCount = new Label { AutoSize = true };
-        private readonly Button refreshKit = Button("Refresh from GitHub");
-        private readonly Button openKit = Button("Open on GitHub");
-        private readonly Button installKitItem = Button("Add to Start");
+        private readonly Label kitStatus = BrowserStatus();
+        private readonly Label kitCount = new Label { AutoSize = true, Margin = new Padding(12, 4, 3, 3) };
+        private readonly TextBox kitDetails = BrowserDetails();
+        private readonly ProgressBar kitActivity = BrowserActivity();
+        private readonly Button refreshKit = Button("Refresh from SD Card Kit");
+        private readonly Button openKit = Button("Open project page");
+        private readonly Button installKitItem = Button("Install to Start");
+        private readonly Button launchKitItem = Button("Download and launch");
         private KitItem[] kitItems;
         private string kitRevision;
         private bool loadingKit;
@@ -28,34 +32,30 @@ namespace CommanderX16
         private void BuildKitPage(TabPage page, TabControl tabs, TabPage start)
         {
             var body = PageBody(page);
-            kitSearch.AccessibleName = "Find a file or folder";
-            AddRow(body, Pair("Find a file or folder", kitSearch, refreshKit));
-            AddRow(body, kitCount);
+            kitSearch.AccessibleName = "Find a program in the SD Card Kit";
+            AddRow(body, Pair("Find a program", kitSearch, refreshKit));
+            AddRow(body, Flow(new CheckBox { Text = "Downloadable only", AutoSize = true, Checked = true, Enabled = false }, kitCount));
             AddRow(body, kitTree, SizeType.Percent, 100);
-            AddRow(body, Flow(openKit, installKitItem));
+            AddRow(body, kitDetails, SizeType.Absolute, 112);
+            AddRow(body, Flow(openKit, installKitItem, launchKitItem, kitActivity));
             AddRow(body, kitStatus);
             refreshKit.Click += async (sender, args) => await LoadKit();
             kitSearch.TextChanged += (sender, args) => ShowKitItems();
             openKit.Click += (sender, args) => OpenKitItem(kitTree.SelectedNode);
             kitTree.AfterSelect += (sender, args) => UpdateKitSelection();
             installKitItem.Click += async (sender, args) =>
+                ShowInstalledEntry(await AddKitItemToStart(), tabs, start, "SD Card Kit");
+            launchKitItem.Click += async (sender, args) =>
             {
-                var id = await AddKitItemToStart();
-                if (id == null) return;
-                search.Clear();
-                RefreshPrograms(id);
-                tabs.SelectedTab = start;
-                launchStatus.Text = "Added from SD Card Kit";
+                var item = kitTree.SelectedNode?.Tag as KitItem;
+                if (!loadingKit && !launching && item?.CanInstall == true)
+                    await LaunchFromBrowser(progress => GetKitProgram(item), SetKitBusy, kitStatus);
             };
             kitTree.NodeMouseDoubleClick += (sender, args) =>
             {
-                if (args.Button != MouseButtons.Left || !(args.Node.Tag is KitItem item) || item.Type != "blob") return;
-                if (item.CanInstall)
-                {
-                    kitTree.SelectedNode = args.Node;
-                    installKitItem.PerformClick();
-                }
-                else OpenKitItem(args.Node);
+                if (args.Button != MouseButtons.Left || !(args.Node.Tag is KitItem item) || !item.CanInstall) return;
+                kitTree.SelectedNode = args.Node;
+                installKitItem.PerformClick();
             };
             UpdateKitSelection();
             tabs.SelectedIndexChanged += async (sender, args) =>
@@ -67,34 +67,26 @@ namespace CommanderX16
         private async Task LoadKit()
         {
             if (loadingKit) return;
-            loadingKit = true;
-            UpdateKitSelection();
-            kitStatus.Text = "Loading the SD Card Kit…";
+            SetKitBusy(true, "Loading the SD Card Kit…");
             try
             {
                 var snapshot = await PowerShell.Execute<KitSnapshot>(new Request { Action = "SdCardTree" });
                 if (snapshot?.Tree == null || snapshot.Truncated ||
                     !Regex.IsMatch(snapshot.Revision ?? "", @"\A[0-9a-f]{40}\z"))
                     throw new InvalidOperationException("GitHub returned an incomplete file tree.");
-                var items = snapshot.Tree.Where(item => item.Path?.StartsWith(KitRoot + "/", StringComparison.Ordinal) == true &&
-                    (item.Type == "tree" || item.Type == "blob")).ToArray();
-                if (items.Length == 0)
-                    throw new InvalidOperationException("GitHub returned no files under " + KitRoot + ".");
-                kitItems = items;
+                kitItems = snapshot.Tree.Where(item => item.Path?.StartsWith(KitRoot + "/", StringComparison.Ordinal) == true &&
+                    item.CanInstall).ToArray();
                 kitRevision = snapshot.Revision;
                 ShowKitItems();
                 kitStatus.Text = "";
             }
             catch (Exception error)
             {
-                kitStatus.Text = (kitItems == null ? "Could not load the kit. " :
-                    "Refresh failed. Showing the previously loaded kit. ") + error.Message;
+                kitStatus.Text = kitItems == null ? "SD Card Kit unavailable. Try refreshing again." :
+                    "Refresh failed. Showing the previously loaded kit.";
+                if (kitItems == null) kitDetails.Text = error.Message;
             }
-            finally
-            {
-                loadingKit = false;
-                UpdateKitSelection();
-            }
+            finally { SetKitBusy(false, null); }
         }
 
         private void ShowKitItems()
@@ -125,19 +117,34 @@ namespace CommanderX16
             }
             finally { kitTree.EndUpdate(); }
 
-            int count = visible.Count(item => item.Type == "blob");
-            int total = kitItems.Count(item => item.Type == "blob");
-            kitCount.Text = filter.Length == 0 ? $"{total:N0} files" : $"{count:N0} of {total:N0} files";
+            kitCount.Text = visible.Length == kitItems.Length
+                ? $"{visible.Length:N0} {(visible.Length == 1 ? "program" : "programs")}"
+                : $"{visible.Length:N0} of {kitItems.Length:N0} programs";
+            UpdateKitSelection();
+        }
+
+        private void SetKitBusy(bool busy, string message)
+        {
+            loadingKit = busy;
+            kitActivity.Visible = busy;
+            refreshKit.Enabled = kitSearch.Enabled = kitTree.Enabled = !busy;
+            if (message != null) kitStatus.Text = message;
             UpdateKitSelection();
         }
 
         private void UpdateKitSelection()
         {
             var item = kitTree.SelectedNode?.Tag as KitItem;
-            refreshKit.Enabled = !loadingKit;
-            installKitItem.Enabled = !loadingKit && !launching && item?.CanInstall == true;
-            installKitItem.Text = item != null && store.Data.Programs.Any(entry => entry.SdKitSource == item.Path)
-                ? "Reinstall to Start" : "Add to Start";
+            bool supported = item?.CanInstall == true;
+            openKit.Enabled = !loadingKit && kitTree.SelectedNode != null;
+            installKitItem.Enabled = launchKitItem.Enabled = !loadingKit && !launching && supported;
+            installKitItem.Visible = launchKitItem.Visible = supported;
+            installKitItem.Text = supported && store.Data.Programs.Any(entry => entry.SdKitSource == item.Path)
+                ? "Reinstall to Start" : "Install to Start";
+            if (kitItems != null)
+                kitDetails.Text = supported ? kitTree.SelectedNode.Text + Environment.NewLine +
+                    item.Path.Substring(KitRoot.Length + 1) :
+                    kitTree.SelectedNode?.Name.Substring(KitRoot.Length + 1) ?? "No matching programs.";
         }
 
         private async Task<string> AddKitItemToStart()
@@ -145,30 +152,17 @@ namespace CommanderX16
             var item = kitTree.SelectedNode?.Tag as KitItem;
             if (loadingKit || launching || item?.CanInstall != true) return null;
             string extracted = null;
-            loadingKit = true;
-            UpdateKitSelection();
+            SetKitBusy(true, "Preparing installation…");
             try
             {
-                var root = await EnsureKitSnapshot();
-                var path = Path.Combine(root, item.Path.Substring(KitRoot.Length + 1).Replace('/', Path.DirectorySeparatorChar));
-                if (!File.Exists(path))
-                    throw new IOException("The program file is missing from the downloaded SD Card Kit.");
-
-                if (item.IsZip)
+                var (path, root) = await GetKitProgram(item);
+                if (path == null)
                 {
-                    kitStatus.Text = "Extracting program ZIP…";
-                    extracted = Path.Combine(SettingsStore.Home, "SdCardKit", "Packages", Guid.NewGuid().ToString("N"));
-                    string[] choices = await Task.Run(() => Catalog.ExtractCandidates(path, extracted, null, includeBasic: true));
-                    int selected = choices.Length == 1 ? 0 : LauncherDialogs.SelectItem(this, "Choose the startup program", choices);
-                    if (selected < 0)
-                    {
-                        kitStatus.Text = "Installation canceled.";
-                        return null;
-                    }
-                    root = extracted;
-                    path = Path.Combine(root, choices[selected]);
+                    kitStatus.Text = "Installation canceled.";
+                    return null;
                 }
-
+                if (item.IsZip) extracted = root;
+                kitStatus.Text = "Adding program to Start…";
                 string id = null;
                 store.Save(data =>
                 {
@@ -190,8 +184,13 @@ namespace CommanderX16
                     id = entry.Id;
                 });
                 extracted = null;
-                kitStatus.Text = "Added to Start.";
+                kitStatus.Text = "Installed " + Path.GetFileNameWithoutExtension(path) + " and added it to Start.";
                 return id;
+            }
+            catch (DownloadForbiddenException error)
+            {
+                ShowForbiddenDownload(error, kitStatus);
+                return null;
             }
             catch (Exception error)
             {
@@ -201,9 +200,33 @@ namespace CommanderX16
             }
             finally
             {
+                SetKitBusy(false, null);
                 if (extracted != null && Directory.Exists(extracted)) Directory.Delete(extracted, true);
-                loadingKit = false;
-                UpdateKitSelection();
+            }
+        }
+
+        private async Task<(string Path, string Root)> GetKitProgram(KitItem item)
+        {
+            var root = await EnsureKitSnapshot();
+            var path = Path.Combine(root, item.Path.Substring(KitRoot.Length + 1).Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(path))
+                throw new IOException("The program file is missing from the downloaded SD Card Kit.");
+            if (!item.IsZip) return (path, root);
+
+            kitStatus.Text = "Extracting program ZIP…";
+            var extracted = Path.Combine(SettingsStore.Home, "SdCardKit", "Packages", Guid.NewGuid().ToString("N"));
+            try
+            {
+                string[] choices = await Task.Run(() => Catalog.ExtractCandidates(path, extracted, null, includeBasic: true));
+                int selected = choices.Length == 1 ? 0 : LauncherDialogs.SelectItem(this, "Choose the startup program", choices);
+                if (selected < 0) return (null, null);
+                root = extracted;
+                extracted = null;
+                return (Path.Combine(root, choices[selected]), root);
+            }
+            finally
+            {
+                if (extracted != null && Directory.Exists(extracted)) Directory.Delete(extracted, true);
             }
         }
 
@@ -212,7 +235,11 @@ namespace CommanderX16
             var parent = Path.Combine(SettingsStore.Home, "SdCardKit");
             var revision = kitRevision;
             var destination = Path.Combine(parent, revision);
-            if (Directory.Exists(destination)) return destination;
+            if (Directory.Exists(destination))
+            {
+                kitStatus.Text = "Preparing program from the installed kit…";
+                return destination;
+            }
 
             var stage = Path.Combine(parent, "." + Guid.NewGuid().ToString("N"));
             var archive = Path.Combine(stage, "kit.zip");

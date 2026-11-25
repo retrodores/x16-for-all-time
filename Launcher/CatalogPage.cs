@@ -14,26 +14,41 @@ namespace CommanderX16
         private readonly CheckBox downloadableOnly = new CheckBox { Text = "Downloadable only", AutoSize = true };
         private readonly Label catalogCount = new Label { AutoSize = true, Margin = new Padding(12, 4, 3, 3) };
         private readonly TreeView catalogTree = new TreeView { Dock = DockStyle.Fill, HideSelection = false };
-        private readonly TextBox catalogDetails = new TextBox
-        {
-            Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical,
-            AccessibleName = "Selected program details"
-        };
+        private readonly TextBox catalogDetails = BrowserDetails();
         private readonly Button refreshCatalog = Button("Refresh from X16 Files");
         private readonly Button openProject = Button("Open project page");
         private readonly Button installProgram = Button("Install to Start");
         private readonly Button downloadProgram = Button("Download and launch");
-        private readonly Label catalogStatus = new Label
+        private readonly Label catalogStatus = BrowserStatus();
+        private readonly ProgressBar catalogActivity = BrowserActivity();
+        private CatalogProgram[] catalogPrograms;
+        private bool catalogBusy;
+
+        private static TextBox BrowserDetails() => new TextBox
+        {
+            Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical,
+            AccessibleName = "Selected program details"
+        };
+
+        private static Label BrowserStatus() => new Label
         {
             Dock = DockStyle.Fill, AutoEllipsis = true, Height = 24, ForeColor = Navy
         };
-        private readonly ProgressBar catalogActivity = new ProgressBar
+
+        private static ProgressBar BrowserActivity() => new ProgressBar
         {
             Size = new Size(86, 16), Margin = new Padding(4, 7, 4, 0), Style = ProgressBarStyle.Marquee,
-            MarqueeAnimationSpeed = 25, Visible = false, AccessibleName = "Catalog activity"
+            MarqueeAnimationSpeed = 25, Visible = false, AccessibleName = "Download activity"
         };
-        private CatalogProgram[] catalogPrograms;
-        private bool catalogBusy;
+
+        private void ShowInstalledEntry(string id, TabControl tabs, TabPage start, string source)
+        {
+            if (id == null) return;
+            search.Clear();
+            RefreshPrograms(id);
+            tabs.SelectedTab = start;
+            launchStatus.Text = "Added to Start from " + source;
+        }
 
         private void BuildCatalogPage(TabPage page, TabControl tabs, TabPage start)
         {
@@ -68,14 +83,7 @@ namespace CommanderX16
                 Process.Start(new ProcessStartInfo(program.PageUrl) { UseShellExecute = true });
             });
             installProgram.Click += async (sender, args) =>
-            {
-                var id = await InstallCatalogProgram();
-                if (id == null) return;
-                search.Clear();
-                RefreshPrograms(id);
-                tabs.SelectedTab = start;
-                launchStatus.Text = "Added from X16 Files";
-            };
+                ShowInstalledEntry(await InstallCatalogProgram(), tabs, start, "X16 Files");
             downloadProgram.Click += async (sender, args) => await LaunchCatalogProgram();
         }
 
@@ -234,7 +242,7 @@ namespace CommanderX16
             }
             catch (DownloadForbiddenException error)
             {
-                ShowForbiddenDownload(error);
+                ShowForbiddenDownload(error, catalogStatus);
                 return null;
             }
             catch (Exception error)
@@ -246,9 +254,9 @@ namespace CommanderX16
             finally { SetCatalogBusy(false); }
         }
 
-        private void ShowForbiddenDownload(DownloadForbiddenException error)
+        private void ShowForbiddenDownload(DownloadForbiddenException error, Label status)
         {
-            catalogStatus.Text = "Download blocked (HTTP 403)";
+            status.Text = "Download blocked (HTTP 403)";
             var message = error.Message + " Try the original download link in your browser." +
                 Environment.NewLine + Environment.NewLine + error.Url;
             if (LauncherDialogs.OfferBrowser(this, message, "Download blocked"))
@@ -259,6 +267,19 @@ namespace CommanderX16
         {
             var program = catalogTree.SelectedNode?.Tag as CatalogProgram;
             if (catalogBusy || launching || (program?.Downloads.Length ?? 0) == 0) return;
+            await LaunchFromBrowser(async progress =>
+            {
+                var package = SelectCatalogDownload(program);
+                if (package == null) return (null, null);
+                var path = await Catalog.Download(program, package, progress, SelectCatalogPrg);
+                return (path, null);
+            }, SetCatalogBusy, catalogStatus);
+        }
+
+        private async Task LaunchFromBrowser(
+            Func<IProgress<string>, Task<(string Path, string Root)>> getProgram,
+            Action<bool, string> setBusy, Label status)
+        {
             var emulator = store.Data.FindEmulator(store.Data.StartEmulatorId);
             var source = emulator == null ? null : store.Data.StartOptions;
             if (emulator == null && store.Data.Emulators.Count == 1)
@@ -272,34 +293,32 @@ namespace CommanderX16
                 return;
             }
 
-            var package = SelectCatalogDownload(program);
-            if (package == null) return;
             var options = Profile.CopyOptions(source, emulator);
             options.AutoRun = true;
             launching = true;
             RefreshPreview();
-            SetCatalogBusy(true, "Preparing download…");
+            setBusy(true, "Preparing download…");
             Request request = null;
             try
             {
-                var path = await Catalog.Download(program, package,
-                    new Progress<string>(message => catalogStatus.Text = message), SelectCatalogPrg);
-                if (path == null)
+                var program = await getProgram(new Progress<string>(message => status.Text = message));
+                if (program.Path == null)
                 {
-                    catalogStatus.Text = "Download canceled";
+                    status.Text = "Download canceled";
                     return;
                 }
-                request = Launch.Prepare(emulator, options, path, true);
-                catalogStatus.Text = "Starting emulator…";
-                await StartPreparedProgram(request, message => catalogStatus.Text = message);
+
+                request = Launch.Prepare(emulator, options, program.Path, true, program.Root);
+                status.Text = "Starting emulator…";
+                await StartPreparedProgram(request, message => status.Text = message);
             }
             catch (DownloadForbiddenException error)
             {
-                ShowForbiddenDownload(error);
+                ShowForbiddenDownload(error, status);
             }
             catch (Exception error)
             {
-                catalogStatus.Text = request == null ? "Could not prepare the program" : "Launch failed";
+                status.Text = request == null ? "Could not prepare the program" : "Launch failed";
                 var details = request == null ? error.Message :
                     error.Message + Environment.NewLine + Environment.NewLine + CommandPreview(request);
                 LauncherDialogs.Message(this, details, "Download and launch");
@@ -307,7 +326,7 @@ namespace CommanderX16
             finally
             {
                 launching = false;
-                SetCatalogBusy(false);
+                setBusy(false, null);
                 RefreshPreview();
             }
         }

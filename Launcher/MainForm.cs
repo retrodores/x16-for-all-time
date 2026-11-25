@@ -99,7 +99,7 @@ namespace CommanderX16
             duplicateProfile.Click += (sender, args) => Attempt(() => SaveProfile(SelectedProfile, true));
             deleteProfile.Click += (sender, args) => Attempt(RemoveProfile);
             defaultProfile.Click += (sender, args) => Attempt(SetDefaultProfile);
-            FormClosing += (sender, args) => { if (launching || catalogBusy) args.Cancel = true; };
+            FormClosing += (sender, args) => { if (launching || catalogBusy || loadingKit) args.Cancel = true; };
             BindEmulators(null, null);
         }
 
