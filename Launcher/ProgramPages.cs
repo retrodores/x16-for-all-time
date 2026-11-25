@@ -20,6 +20,7 @@ namespace CommanderX16
         private int launchAttempt;
         private readonly CheckBox saveGif = new CheckBox { Text = "Save GIF", AutoSize = true };
         private readonly TextBox gifFile = Entry();
+        private readonly Button browseGif = Button("Browse…");
         private readonly Button startDefaults = Button("Start defaults…");
         private readonly Label launchConfiguration = new Label { AutoSize = true };
         private readonly Button duplicate = Button("Duplicate entry…"),
@@ -43,7 +44,8 @@ namespace CommanderX16
             AddRow(startBody, Flow(duplicate, removeProgram));
             gifFile.AccessibleName = "GIF output file";
             AddRow(startBody, Pair("", saveGif));
-            AddRow(startBody, Pair("File (blank: demo.gif)", gifFile));
+            browseGif.AccessibleName = "Browse for GIF output file";
+            AddRow(startBody, Pair("File (blank: demo.gif)", gifFile, browseGif));
             AddRow(startBody, launchConfiguration);
             AddRow(startBody, preview, SizeType.Absolute, 83);
             run.BackColor = Teal;
@@ -53,6 +55,7 @@ namespace CommanderX16
 
             saveGif.CheckedChanged += (sender, args) => RefreshPreview();
             gifFile.TextChanged += (sender, args) => RefreshPreview();
+            browseGif.Click += (sender, args) => Attempt(PickStartGif);
             search.TextChanged += (sender, args) => RefreshPrograms();
             startMenu.SelectedIndexChanged += (sender, args) => RefreshPreview();
             BuildStartContextMenu();
@@ -196,6 +199,40 @@ namespace CommanderX16
             }
         }
 
+        private void PickStartGif()
+        {
+            var program = startMenu.SelectedItem as ProgramEntry;
+            if (program == null) return;
+
+            using (var dialog = new SaveFileDialog
+            {
+                Title = "Save GIF recording",
+                Filter = "GIF recording (*.gif;*.gi)|*.gif;*.gi",
+                DefaultExt = "gif",
+                FileName = "demo.gif",
+                InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+                OverwritePrompt = false
+            })
+            {
+                var current = gifFile.Text.Trim();
+                if (current.Length != 0)
+                {
+                    try
+                    {
+                        var path = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(program.Path), current));
+                        var directory = Path.GetDirectoryName(path);
+                        if (Directory.Exists(directory)) dialog.InitialDirectory = directory;
+                        var filename = Path.GetFileName(path);
+                        if (filename.Length != 0 && filename.IndexOfAny(Path.GetInvalidFileNameChars()) < 0)
+                            dialog.FileName = filename;
+                    }
+                    catch (Exception error) when (error is ArgumentException || error is NotSupportedException ||
+                        error is PathTooLongException) { }
+                }
+                if (dialog.ShowDialog(this) == DialogResult.OK) gifFile.Text = dialog.FileName;
+            }
+        }
+
         private Request Prepare(ProgramEntry program, Emulator emulator, bool validate)
         {
             var options = store.Data.LaunchOptions(program);
@@ -216,7 +253,7 @@ namespace CommanderX16
             run.Enabled = false;
             run.Text = program != null && store.Data.LaunchOptions(program).AutoRun ? "Run PRG" : "Load PRG";
             saveGif.Enabled = !launching && program != null;
-            gifFile.Enabled = saveGif.Enabled && saveGif.Checked;
+            gifFile.Enabled = browseGif.Enabled = saveGif.Enabled && saveGif.Checked;
             startDefaults.Enabled = !launching && store.Data.Emulators.Count != 0;
             launchConfiguration.Text = emulator == null ? "Command preview" :
                 (store.Data.UsesStartDefaults(program) ? "Start defaults" : "PRG settings") + " · " + emulator.Name;
