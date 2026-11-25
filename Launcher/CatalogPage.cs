@@ -235,6 +235,11 @@ namespace CommanderX16
                 catalogStatus.Text = "Installed " + program + " and added it to Start.";
                 return id;
             }
+            catch (DownloadForbiddenException error)
+            {
+                ShowForbiddenDownload(error);
+                return null;
+            }
             catch (Exception error)
             {
                 catalogStatus.Text = "Installation failed";
@@ -242,6 +247,15 @@ namespace CommanderX16
                 return null;
             }
             finally { SetCatalogBusy(false); }
+        }
+
+        private void ShowForbiddenDownload(DownloadForbiddenException error)
+        {
+            catalogStatus.Text = "Download blocked (HTTP 403)";
+            var message = error.Message + " Try the original download link in your browser." +
+                Environment.NewLine + Environment.NewLine + error.Url;
+            if (LauncherDialogs.OfferBrowser(this, message, "Download blocked"))
+                Attempt(() => Process.Start(new ProcessStartInfo(error.Url) { UseShellExecute = true }));
         }
 
         private async Task LaunchCatalogProgram()
@@ -281,6 +295,10 @@ namespace CommanderX16
                 request = Launch.Prepare(emulator, options, path, true);
                 catalogStatus.Text = "Starting emulator…";
                 await StartPreparedProgram(request, message => catalogStatus.Text = message);
+            }
+            catch (DownloadForbiddenException error)
+            {
+                ShowForbiddenDownload(error);
             }
             catch (Exception error)
             {

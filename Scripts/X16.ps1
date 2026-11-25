@@ -127,5 +127,9 @@ try {
 }
 catch {
     [IO.File]::WriteAllText($ResultFile, $_.Exception.Message, $utf8)
+    # Exit code 3 reports HTTP 403 for a catalog package to the launcher.
+    if ($request.Action -eq 'Download' -and [int]$_.Exception.Response.StatusCode -eq 403) {
+        exit 3
+    }
     exit 1
 }

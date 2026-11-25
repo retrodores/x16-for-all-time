@@ -5,6 +5,16 @@ using System.Threading.Tasks;
 
 namespace CommanderX16
 {
+    internal sealed class DownloadForbiddenException : IOException
+    {
+        internal DownloadForbiddenException(string url) : base("The download server returned HTTP 403 (Forbidden).")
+        {
+            Url = url;
+        }
+
+        internal string Url { get; }
+    }
+
     internal static class PowerShell
     {
         public static Task<Result> Execute(Request request, IProgress<string> progress = null) => Execute<Result>(request, progress);
@@ -46,6 +56,8 @@ namespace CommanderX16
                     process.BeginOutputReadLine();
                     Task<string> errors = process.StandardError.ReadToEndAsync();
                     process.WaitForExit(-1);
+                    if (process.ExitCode == 3 && request.Action == "Download")
+                        throw new DownloadForbiddenException(request.Url);
                     if (process.ExitCode != 0)
                     {
                         string error = File.Exists(resultFile) ? File.ReadAllText(resultFile) :

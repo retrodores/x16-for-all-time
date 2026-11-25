@@ -14,12 +14,16 @@ namespace CommanderX16
         }
 
         internal static bool Confirm(Form owner, string message, string title) =>
-            ShowMessage(owner, message, title, true) == DialogResult.Yes;
+            ShowMessage(owner, message, title, "&Yes", "&No") == DialogResult.Yes;
 
         internal static void Message(Form owner, string message, string title) =>
-            ShowMessage(owner, message, title, false);
+            ShowMessage(owner, message, title);
 
-        private static DialogResult ShowMessage(Form owner, string message, string title, bool confirm)
+        internal static bool OfferBrowser(Form owner, string message, string title) =>
+            ShowMessage(owner, message, title, "&Open in browser", "Close") == DialogResult.Yes;
+
+        private static DialogResult ShowMessage(Form owner, string message, string title,
+            string acceptText = null, string closeText = "OK")
         {
             var font = owner?.Font ?? SystemFonts.MessageBoxFont;
             using (var icon = owner == null ? Icon.ExtractAssociatedIcon(Application.ExecutablePath) : null)
@@ -44,13 +48,13 @@ namespace CommanderX16
                     Text = message, Dock = DockStyle.Fill, Multiline = true, ReadOnly = true,
                     BorderStyle = BorderStyle.None, BackColor = dialog.BackColor, ScrollBars = ScrollBars.Vertical
                 }, SizeType.Percent, 100);
-                var close = Button(confirm ? "&No" : "OK");
-                close.DialogResult = confirm ? DialogResult.No : DialogResult.OK;
+                var close = Button(closeText);
+                close.DialogResult = acceptText == null ? DialogResult.OK : DialogResult.No;
                 var actions = Flow(close);
                 actions.FlowDirection = FlowDirection.RightToLeft;
-                if (confirm)
+                if (acceptText != null)
                 {
-                    var yes = Button("&Yes");
+                    var yes = Button(acceptText);
                     yes.DialogResult = DialogResult.Yes;
                     actions.Controls.Add(yes);
                 }
