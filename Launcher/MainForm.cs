@@ -27,8 +27,7 @@ namespace CommanderX16
         public MainForm(SettingsStore store)
         {
             this.store = store;
-            var versionedTitle = Program.Title + " " + typeof(MainForm).Assembly.GetName().Version.ToString(3);
-            Text = versionedTitle;
+            Text = Program.Title + " " + typeof(MainForm).Assembly.GetName().Version.ToString(3);
             Font = new Font("Segoe UI", 10);
             AutoScaleMode = AutoScaleMode.Dpi;
             MinimumSize = new Size(700, 630);
@@ -46,7 +45,7 @@ namespace CommanderX16
 
             var title = new Label
             {
-                Text = versionedTitle,
+                Text = Program.Title,
                 Font = new Font("Segoe UI Semibold", 20),
                 AutoSize = true, ForeColor = Navy, Margin = Padding.Empty
             };
