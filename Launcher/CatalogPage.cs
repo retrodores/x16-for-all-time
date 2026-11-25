@@ -174,7 +174,6 @@ namespace CommanderX16
                 cancel.DialogResult = DialogResult.Cancel;
                 dialog.AcceptButton = select;
                 dialog.CancelButton = cancel;
-                dialog.ActiveControl = list;
                 list.DoubleClick += (sender, args) =>
                 {
                     if (list.IndexFromPoint(list.PointToClient(Cursor.Position)) >= 0)
@@ -182,6 +181,7 @@ namespace CommanderX16
                 };
                 AddRow(body, list, SizeType.Percent, 100);
                 AddRow(body, Flow(select, cancel));
+                dialog.ActiveControl = list;
                 return LauncherDialogs.Show(dialog, this) == DialogResult.OK ? list.SelectedIndex : -1;
             }
         }
