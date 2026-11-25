@@ -26,6 +26,10 @@ Each build starts with a **Default** profile and can have additional named profi
 
 **Remove from list** removes a registration and keeps its files on disk. PRGs referring to the build keep their options and ask for a new emulator. Profiles from removed builds remain available to copy.
 
+## Linux and macOS ports
+
+The port specification describes the launcher, X16 Files JSON feed, ZIP handling, and X16Emu command line. [SPECIFICATION.md](SPECIFICATION.md)
+
 ## Build on Windows
 
 Use a Visual Studio Developer PowerShell with the .NET Framework 4.8 targeting pack and Inno Setup 6. Run .\Build.ps1 to compile the application and create dist\X16ForAllTime-Setup.exe. Use -ISCC if Inno Setup is installed elsewhere. Windows PowerShell 5.1 handles emulator release discovery and installation.
