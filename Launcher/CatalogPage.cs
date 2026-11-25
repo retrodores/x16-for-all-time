@@ -13,7 +13,7 @@ namespace CommanderX16
         private readonly TextBox catalogSearch = Entry();
         private readonly CheckBox downloadableOnly = new CheckBox { Text = "Downloadable only", AutoSize = true };
         private readonly Label catalogCount = new Label { AutoSize = true, Margin = new Padding(12, 4, 3, 3) };
-        private readonly ListBox catalogList = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
+        private readonly TreeView catalogTree = new TreeView { Dock = DockStyle.Fill, HideSelection = false };
         private readonly TextBox catalogDetails = new TextBox
         {
             Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical,
@@ -39,10 +39,10 @@ namespace CommanderX16
         {
             var body = PageBody(page);
             catalogSearch.AccessibleName = "Find a catalog program";
-            catalogList.AccessibleName = "X16 Files programs";
+            catalogTree.AccessibleName = "X16 Files programs";
             AddRow(body, Pair("Find a program", catalogSearch, refreshCatalog));
             AddRow(body, Flow(downloadableOnly, catalogCount));
-            AddRow(body, catalogList, SizeType.Percent, 100);
+            AddRow(body, catalogTree, SizeType.Percent, 100);
             AddRow(body, catalogDetails, SizeType.Absolute, 112);
             AddRow(body, Flow(openProject, installProgram, downloadProgram, catalogActivity));
             AddRow(body, catalogStatus);
@@ -55,18 +55,16 @@ namespace CommanderX16
             refreshCatalog.Click += async (sender, args) => await LoadCatalog();
             catalogSearch.TextChanged += (sender, args) => ShowCatalogPrograms();
             downloadableOnly.CheckedChanged += (sender, args) => ShowCatalogPrograms();
-            catalogList.SelectedIndexChanged += (sender, args) => UpdateCatalogSelection();
-            catalogList.MouseDoubleClick += (sender, args) =>
+            catalogTree.AfterSelect += (sender, args) => UpdateCatalogSelection();
+            catalogTree.NodeMouseDoubleClick += (sender, args) =>
             {
-                if (args.Button != MouseButtons.Left) return;
-                int index = catalogList.IndexFromPoint(args.Location);
-                if (index < 0) return;
-                catalogList.SelectedIndex = index;
+                if (args.Button != MouseButtons.Left || !(args.Node.Tag is CatalogProgram)) return;
+                catalogTree.SelectedNode = args.Node;
                 installProgram.PerformClick();
             };
             openProject.Click += (sender, args) => Attempt(() =>
             {
-                var program = (CatalogProgram)catalogList.SelectedItem;
+                var program = (CatalogProgram)catalogTree.SelectedNode.Tag;
                 Process.Start(new ProcessStartInfo(program.PageUrl) { UseShellExecute = true });
             });
             installProgram.Click += async (sender, args) =>
@@ -105,7 +103,7 @@ namespace CommanderX16
         private void ShowCatalogPrograms()
         {
             if (catalogPrograms == null) return;
-            var id = (catalogList.SelectedItem as CatalogProgram)?.Id;
+            var id = (catalogTree.SelectedNode?.Tag as CatalogProgram)?.Id;
             var filter = catalogSearch.Text.Trim();
             var entries = catalogPrograms
                 .Where(program => !downloadableOnly.Checked || program.Downloads.Length > 0)
@@ -116,21 +114,44 @@ namespace CommanderX16
             catalogCount.Text = entries.Length == catalogPrograms.Length
                 ? $"{entries.Length:N0} {(entries.Length == 1 ? "program" : "programs")}"
                 : $"{entries.Length:N0} of {catalogPrograms.Length:N0} programs";
-            catalogList.BeginUpdate();
+            var selectedCategory = catalogTree.SelectedNode?.Level == 0 ? catalogTree.SelectedNode.Name : null;
+            var expanded = new System.Collections.Generic.HashSet<string>(catalogTree.Nodes.Cast<TreeNode>()
+                .Where(node => node.IsExpanded).Select(node => node.Name), StringComparer.OrdinalIgnoreCase);
+            catalogTree.BeginUpdate();
             try
             {
-                catalogList.Items.Clear();
-                catalogList.Items.AddRange(entries);
-                if (entries.Length > 0)
-                    catalogList.SelectedIndex = Math.Max(0, Array.FindIndex(entries, program => program.Id == id));
+                catalogTree.Nodes.Clear();
+                TreeNode selected = null;
+                var groups = entries.GroupBy(program => string.IsNullOrWhiteSpace(program.Category)
+                    ? "Uncategorized" : program.Category.Trim(), StringComparer.OrdinalIgnoreCase);
+                foreach (var group in groups.OrderBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase))
+                {
+                    var label = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(group.Key);
+                    var category = catalogTree.Nodes.Add(group.Key, $"{label} ({group.Count():N0})");
+                    if (string.Equals(group.Key, selectedCategory, StringComparison.OrdinalIgnoreCase)) selected = category;
+                    foreach (var program in group)
+                    {
+                        var node = category.Nodes.Add(program.ToString());
+                        node.Tag = program;
+                        if (program.Id == id) selected = node;
+                    }
+                    if (filter.Length != 0 || expanded.Contains(group.Key)) category.Expand();
+                }
+                if (selected != null)
+                {
+                    selected.EnsureVisible();
+                    catalogTree.SelectedNode = selected;
+                }
+                else if (catalogTree.Nodes.Count > 0)
+                    catalogTree.SelectedNode = catalogTree.Nodes[0];
             }
-            finally { catalogList.EndUpdate(); }
+            finally { catalogTree.EndUpdate(); }
             UpdateCatalogSelection();
         }
 
         private void UpdateCatalogSelection()
         {
-            var program = catalogList.SelectedItem as CatalogProgram;
+            var program = catalogTree.SelectedNode?.Tag as CatalogProgram;
             openProject.Enabled = !catalogBusy && Catalog.IsWebUrl(program?.PageUrl);
             downloadProgram.Enabled = !catalogBusy && !launching && (program?.Downloads.Length ?? 0) > 0;
             installProgram.Enabled = downloadProgram.Enabled;
@@ -139,7 +160,8 @@ namespace CommanderX16
                 ? "Reinstall to Start" : "Install to Start";
             if (program == null)
             {
-                if (catalogPrograms != null) catalogDetails.Text = "No matching programs.";
+                if (catalogPrograms != null)
+                    catalogDetails.Text = catalogTree.SelectedNode == null ? "No matching programs." : "";
                 return;
             }
             var metadata = string.Join(" · ", new[] { program.Category, program.Author?.Name, program.Version }
@@ -153,7 +175,7 @@ namespace CommanderX16
         {
             catalogBusy = busy;
             catalogActivity.Visible = busy;
-            refreshCatalog.Enabled = catalogSearch.Enabled = downloadableOnly.Enabled = catalogList.Enabled = !busy;
+            refreshCatalog.Enabled = catalogSearch.Enabled = downloadableOnly.Enabled = catalogTree.Enabled = !busy;
             if (message != null) catalogStatus.Text = message;
             UpdateCatalogSelection();
         }
@@ -174,7 +196,7 @@ namespace CommanderX16
 
         private async Task<string> InstallCatalogProgram()
         {
-            var program = catalogList.SelectedItem as CatalogProgram;
+            var program = catalogTree.SelectedNode?.Tag as CatalogProgram;
             if (catalogBusy || launching || (program?.Downloads.Length ?? 0) == 0) return null;
             var package = SelectCatalogDownload(program);
             if (package == null) return null;
@@ -235,7 +257,7 @@ namespace CommanderX16
 
         private async Task LaunchCatalogProgram()
         {
-            var program = catalogList.SelectedItem as CatalogProgram;
+            var program = catalogTree.SelectedNode?.Tag as CatalogProgram;
             if (catalogBusy || launching || (program?.Downloads.Length ?? 0) == 0) return;
             var emulator = store.Data.FindEmulator(store.Data.StartEmulatorId);
             var source = emulator == null ? null : store.Data.StartOptions;

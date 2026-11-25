@@ -14,9 +14,13 @@ Use **Add PRG** or **Edit PRG** to set the name, path, and launch settings in on
 
 ## X16 Files
 
-Use **Downloadable only** to show entries with a ZIP or PRG link in the catalog. The filter works with the search box.
+Expand a category to see its programs. Use **Downloadable only** to show entries with a ZIP or PRG link in the catalog. The filter works with the search box.
 
 Browse the X16 Files catalog, open a project page, or choose **Install to Start** to download a ZIP or PRG from the catalog and register its PRG in Start. **Reinstall to Start** updates the existing entry while preserving its launch settings. Use **Download and launch** to run a ZIP or PRG from the catalog immediately. The launcher keeps ZIP contents together and uses the catalog’s startup PRG when specified. With no startup hint, it uses the only PRG or asks you to choose among several. Catalog launches use Start defaults, or the default profile of the sole registered emulator, with **Run after loading** enabled.
+
+## SD Card Kit
+
+Browse the Commander X16 SD Card Starter Kit as a folder tree. Search by file or folder path, use **Refresh from GitHub** to fetch the current listing, or open a selected item on GitHub.
 
 ## Emulators and profiles
 

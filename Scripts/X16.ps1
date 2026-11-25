@@ -112,6 +112,11 @@ function Install-X16Release($Release, [string]$Destination, [bool]$Overwrite) {
 
 try {
     $request = [IO.File]::ReadAllText($RequestFile, $utf8) | ConvertFrom-Json
+    if ($request.Action -eq 'SdCardTree') {
+        $headers = @{ 'User-Agent' = 'X16ForAllTime'; Accept = 'application/vnd.github+json'; 'Cache-Control' = 'no-cache' }
+        Invoke-WebRequest -UseBasicParsing -TimeoutSec 30 -Uri 'https://api.github.com/repos/cx16forum/sdcard/git/trees/main?recursive=1' -Headers $headers -OutFile $ResultFile
+        exit 0
+    }
     if ($request.Action -eq 'Catalog') {
         $catalogUrl = 'https://x16files.com/directory/data/launcher.json'
         $headers = @{ 'Cache-Control' = 'no-cache'; Pragma = 'no-cache' }
