@@ -18,7 +18,7 @@ namespace CommanderX16
             Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical,
             AccessibleName = "Selected program details"
         };
-        private readonly Button refreshCatalog = Button("Refresh");
+        private readonly Button refreshCatalog = Button("Refresh from X16 Files");
         private readonly Button openProject = Button("Open project page");
         private readonly Button installProgram = Button("Install to Start");
         private readonly Button downloadProgram = Button("Download and launch");
@@ -80,11 +80,13 @@ namespace CommanderX16
             {
                 catalogPrograms = await Catalog.Fetch();
                 ShowCatalogPrograms();
-                catalogStatus.Text = catalogPrograms.Length + " programs in X16 Files";
+                catalogStatus.Text = catalogPrograms.Length + " programs loaded from X16 Files.";
             }
             catch (Exception error)
             {
-                catalogStatus.Text = "X16 Files catalog unavailable. Choose Refresh to try again.";
+                catalogStatus.Text = catalogPrograms == null
+                    ? "X16 Files catalog unavailable. Try refreshing again."
+                    : "Refresh failed. Showing the previously loaded catalog.";
                 if (catalogPrograms == null)
                     catalogDetails.Text = error.Message;
             }

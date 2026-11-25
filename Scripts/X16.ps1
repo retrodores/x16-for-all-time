@@ -113,7 +113,9 @@ function Install-X16Release($Release, [string]$Destination, [bool]$Overwrite) {
 try {
     $request = [IO.File]::ReadAllText($RequestFile, $utf8) | ConvertFrom-Json
     if ($request.Action -eq 'Catalog') {
-        Download-X16File 'https://x16files.com/directory/data/launcher.json' $ResultFile 30
+        $catalogUrl = 'https://x16files.com/directory/data/launcher.json'
+        $headers = @{ 'Cache-Control' = 'no-cache'; Pragma = 'no-cache' }
+        Invoke-WebRequest -UseBasicParsing -TimeoutSec 30 -Uri $catalogUrl -Headers $headers -OutFile $ResultFile
         exit 0
     }
     $result = switch ($request.Action) {
