@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -10,7 +11,13 @@ namespace CommanderX16
     internal sealed partial class MainForm
     {
         private readonly TextBox search = Entry();
-        private readonly ListBox startMenu = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
+        private readonly ListBox startMenu = new ListBox
+        {
+            Dock = DockStyle.Fill, IntegralHeight = false, SelectionMode = SelectionMode.MultiExtended
+        };
+        private bool updatingStartSelection;
+        private ProgramEntry SelectedProgram => startMenu.SelectedItems.Count == 1
+            ? (ProgramEntry)startMenu.SelectedItem : null;
         private readonly Button startSettings = Button("Launch settings…");
         private readonly ProgressBar launchActivity = new ProgressBar
         {
@@ -25,7 +32,7 @@ namespace CommanderX16
         private readonly Button startDefaults = Button("Start defaults…");
         private readonly Label launchConfiguration = new Label { AutoSize = true };
         private readonly Button duplicate = Button("Duplicate entry…"),
-            removeProgram = Button("Remove from list…");
+            removeProgram = Button("Delete programs…");
 
         private void BuildStartPage(TabPage start, TabControl tabs)
         {
@@ -42,7 +49,7 @@ namespace CommanderX16
             startMenu.ForeColor = Color.White;
             startMenu.Font = new Font("Segoe UI", 13);
             AddRow(startBody, startMenu, SizeType.Percent, 100);
-            AddRow(startBody, Flow(duplicate, removeProgram));
+            AddRow(startBody, Flow(run, duplicate, removeProgram));
             gifFile.AccessibleName = "GIF output file";
             AddRow(startBody, Pair("", saveGif));
             browseGif.AccessibleName = "Browse for GIF output file";
@@ -52,7 +59,7 @@ namespace CommanderX16
             run.BackColor = Teal;
             run.ForeColor = Color.White;
             run.FlatStyle = FlatStyle.Flat;
-            AddRow(startBody, Flow(run, startSettings, copy, launchActivity, launchStatus));
+            AddRow(startBody, Flow(startSettings, copy, launchActivity, launchStatus));
 
             saveGif.CheckedChanged += (sender, args) => RefreshPreview();
             gifFile.TextChanged += (sender, args) => RefreshPreview();
@@ -62,19 +69,20 @@ namespace CommanderX16
             search.TextChanged += (sender, args) => RefreshPrograms();
             startMenu.SelectedIndexChanged += (sender, args) =>
             {
+                if (updatingStartSelection) return;
                 LoadStartGifPath();
                 RefreshPreview();
             };
             BuildStartContextMenu();
             startMenu.MouseDoubleClick += async (sender, args) =>
             {
-                if (args.Button != MouseButtons.Left) return;
+                if (args.Button != MouseButtons.Left || (ModifierKeys & (Keys.Control | Keys.Shift)) != Keys.None) return;
                 int index = startMenu.IndexFromPoint(args.Location);
-                if (index >= 0) await RunSelected(startMenu.Items[index] as ProgramEntry);
+                if (index >= 0 && startMenu.GetSelected(index)) await RunSelected(SelectedProgram);
             };
-            run.Click += async (sender, args) => await RunSelected(startMenu.SelectedItem as ProgramEntry);
+            run.Click += async (sender, args) => await RunSelected(SelectedProgram);
             startDefaults.Click += (sender, args) => Attempt(EditStartDefaults);
-            startSettings.Click += (sender, args) => Attempt(() => EditLaunchSettings(startMenu.SelectedItem as ProgramEntry));
+            startSettings.Click += (sender, args) => Attempt(() => EditLaunchSettings(SelectedProgram));
             copy.Click += (sender, args) => Attempt(CopyPreview);
             removeProgram.Click += (sender, args) => Attempt(RemoveProgram);
             duplicate.Click += (sender, args) => Attempt(DuplicateProgram);
@@ -103,8 +111,11 @@ namespace CommanderX16
             startMenu.ContextMenuStrip = contextMenu;
             startMenu.MouseDown += (sender, args) =>
             {
-                if (args.Button == MouseButtons.Right)
-                    startMenu.SelectedIndex = startMenu.IndexFromPoint(args.Location);
+                if (args.Button != MouseButtons.Right) return;
+                int index = startMenu.IndexFromPoint(args.Location);
+                if (index >= 0 && startMenu.GetSelected(index)) return;
+                startMenu.ClearSelected();
+                if (index >= 0) startMenu.SetSelected(index, true);
             };
             startMenu.Disposed += (sender, args) => contextMenu.Dispose();
         }
@@ -120,38 +131,108 @@ namespace CommanderX16
 
         private void RefreshPrograms(string select = null)
         {
-            string id = select ?? (startMenu.SelectedItem as ProgramEntry)?.Id;
+            var selected = new HashSet<string>(select == null
+                ? startMenu.SelectedItems.Cast<ProgramEntry>().Select(entry => entry.Id)
+                : new[] { select });
             string filter = search.Text.Trim();
             var entries = store.Data.Programs.Where(p =>
                 p.Name.IndexOf(filter, StringComparison.CurrentCultureIgnoreCase) >= 0 ||
                 p.Path.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
                 .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
                 .ThenBy(p => p.Path, StringComparer.OrdinalIgnoreCase).ToArray();
+            updatingStartSelection = true;
             startMenu.BeginUpdate();
             try
             {
                 startMenu.Items.Clear();
                 startMenu.Items.AddRange(entries);
-                if (entries.Length > 0)
-                    startMenu.SelectedIndex = Math.Max(0, Array.FindIndex(entries, p => p.Id == id));
+                for (int i = 0; i < entries.Length; i++)
+                    if (selected.Contains(entries[i].Id)) startMenu.SetSelected(i, true);
+                if (entries.Length > 0 && startMenu.SelectedItems.Count == 0)
+                    startMenu.SetSelected(0, true);
             }
-            finally { startMenu.EndUpdate(); }
+            finally
+            {
+                startMenu.EndUpdate();
+                updatingStartSelection = false;
+            }
+            LoadStartGifPath();
             RefreshPreview();
         }
 
         private void RemoveProgram()
         {
-            var program = (ProgramEntry)startMenu.SelectedItem;
-            if (!LauncherDialogs.Confirm(this, "Remove " + program.Name + " from the PRG list? The program file will stay on disk.",
-                "Remove PRG"))
-                return;
-            store.Save(data => data.Programs.RemoveAll(entry => entry.Id == program.Id));
+            var selected = startMenu.SelectedItems.Cast<ProgramEntry>().ToArray();
+            if (selected.Length == 0) return;
+            var ids = new HashSet<string>(selected.Select(entry => entry.Id));
+            var paths = new HashSet<string>(selected.Select(entry => Path.GetFullPath(entry.Path)),
+                StringComparer.OrdinalIgnoreCase);
+            if (paths.Any(path => !Launch.IsProgramFile(path)))
+                throw new IOException("Only PRG and BAS program files can be deleted from Start.");
+            var shared = store.Data.Programs.Where(entry => !ids.Contains(entry.Id) &&
+                paths.Contains(Path.GetFullPath(entry.Path))).Select(entry => entry.Name).ToArray();
+            if (shared.Length != 0)
+                throw new IOException("These entries share the selected files. Select them too before deleting."
+                    + Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, shared));
+
+            var names = selected.Length == 1 ? selected[0].Name : selected.Length + " selected entries";
+            var message = "Remove " + names + " from Start and permanently delete the following program files?"
+                + Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, paths.OrderBy(path => path))
+                + Environment.NewLine + Environment.NewLine + "Companion files and folders will stay on disk.";
+            if (!LauncherDialogs.Confirm(this, message, "Delete programs")) return;
+
+            DeleteStartPrograms(ids, paths);
+        }
+
+        private void DeleteStartPrograms(HashSet<string> ids, IEnumerable<string> paths)
+        {
+            var moved = new Dictionary<string, string>();
+            try
+            {
+                foreach (var path in paths)
+                {
+                    var staged = Path.Combine(Path.GetDirectoryName(path), ".x16-delete-" + Guid.NewGuid().ToString("N"));
+                    try
+                    {
+                        File.Move(path, staged);
+                        moved.Add(path, staged);
+                    }
+                    catch (FileNotFoundException) { }
+                    catch (DirectoryNotFoundException) { }
+                }
+
+                store.Save(data => data.Programs.RemoveAll(entry => ids.Contains(entry.Id)));
+            }
+            catch (Exception error)
+            {
+                var failures = new List<string>();
+                foreach (var file in moved)
+                {
+                    try { File.Move(file.Value, file.Key); }
+                    catch (Exception restoreError) { failures.Add(file.Value + " → " + file.Key + ": " + restoreError.Message); }
+                }
+                if (failures.Count == 0) throw;
+                throw new IOException(error.Message + Environment.NewLine +
+                    "These files could not be restored automatically." + Environment.NewLine + string.Join(Environment.NewLine, failures), error);
+            }
+
+            var leftovers = new List<string>();
+            foreach (var staged in moved.Values)
+            {
+                try { File.Delete(staged); }
+                catch (IOException) { leftovers.Add(staged); }
+                catch (UnauthorizedAccessException) { leftovers.Add(staged); }
+            }
             RefreshPrograms();
+            if (leftovers.Count != 0)
+                throw new IOException("The entries were removed, but these staged files could not be deleted."
+                    + Environment.NewLine + string.Join(Environment.NewLine, leftovers));
+            launchStatus.Text = ids.Count == 1 ? "Program removed" : ids.Count + " programs removed";
         }
 
         private void DuplicateProgram()
         {
-            var program = (ProgramEntry)startMenu.SelectedItem;
+            var program = SelectedProgram;
             var entry = Json.Read<ProgramEntry>(Json.Write(program));
             entry.Id = Guid.NewGuid().ToString("N");
             entry.Name = program.Name + " (copy)";
@@ -215,7 +296,7 @@ namespace CommanderX16
 
         private void LoadStartGifPath()
         {
-            var id = (startMenu.SelectedItem as ProgramEntry)?.Id;
+            var id = SelectedProgram?.Id;
             if (id == gifEntryId) return;
             Attempt(SaveStartGifPath);
             gifEntryId = id;
@@ -236,7 +317,7 @@ namespace CommanderX16
 
         private void PickStartGif()
         {
-            var program = startMenu.SelectedItem as ProgramEntry;
+            var program = SelectedProgram;
             if (program == null) return;
 
             using (var dialog = new SaveFileDialog
@@ -290,7 +371,7 @@ namespace CommanderX16
 
         private void RefreshPreview()
         {
-            var program = startMenu.SelectedItem as ProgramEntry;
+            var program = SelectedProgram;
             var emulator = program == null ? null : store.Data.LaunchEmulator(program);
             UpdateCatalogSelection();
             UpdateKitSelection();
@@ -302,9 +383,11 @@ namespace CommanderX16
             startDefaults.Enabled = !launching && store.Data.Emulators.Count != 0;
             launchConfiguration.Text = emulator == null ? "Command preview" :
                 (store.Data.UsesStartDefaults(program) ? "Start defaults" : "PRG settings") + " · " + emulator.Name;
-            startSettings.Enabled = duplicate.Enabled = removeProgram.Enabled = !launching && program != null;
+            startSettings.Enabled = duplicate.Enabled = !launching && program != null;
+            removeProgram.Enabled = !launching && startMenu.SelectedItems.Count > 0;
             copy.Enabled = false;
-            if (program == null) preview.Text = store.Data.Programs.Count == 0 ? "Add a PRG to get started." : "No matching PRGs.";
+            if (startMenu.SelectedItems.Count > 1) preview.Text = startMenu.SelectedItems.Count + " programs selected.";
+            else if (program == null) preview.Text = store.Data.Programs.Count == 0 ? "Add a PRG to get started." : "No matching PRGs.";
             else if (store.Data.Emulators.Count == 0) preview.Text = "Register or install an X16Emu build on the Emulators tab.";
             else if (emulator == null) preview.Text = MissingLaunchSetup(program);
             else
@@ -322,7 +405,7 @@ namespace CommanderX16
 
         private void CopyPreview()
         {
-            var program = (ProgramEntry)startMenu.SelectedItem;
+            var program = SelectedProgram;
             Request request = Prepare(program, store.Data.LaunchEmulator(program), false);
             Clipboard.SetText("Start-Process -FilePath " + Launch.PowerShellLiteral(request.Exe) +
                 " -WorkingDirectory " + Launch.PowerShellLiteral(request.WorkingDirectory) +

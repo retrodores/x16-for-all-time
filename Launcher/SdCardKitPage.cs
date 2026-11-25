@@ -209,8 +209,7 @@ namespace CommanderX16
         {
             var root = await EnsureKitSnapshot();
             var path = Path.Combine(root, item.Path.Substring(KitRoot.Length + 1).Replace('/', Path.DirectorySeparatorChar));
-            if (!File.Exists(path))
-                throw new IOException("The program file is missing from the downloaded SD Card Kit.");
+            if (!File.Exists(path)) await RestoreKitFile(item, path);
             if (!item.IsZip) return (path, root);
 
             kitStatus.Text = "Extracting program ZIP…";
@@ -228,6 +227,25 @@ namespace CommanderX16
             {
                 if (extracted != null && Directory.Exists(extracted)) Directory.Delete(extracted, true);
             }
+        }
+
+        private async Task RestoreKitFile(KitItem item, string path)
+        {
+            kitStatus.Text = "Downloading the missing program file…";
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                await PowerShell.Execute(new Request
+                {
+                    Action = "Download",
+                    Url = "https://raw.githubusercontent.com/cx16forum/sdcard/" + kitRevision + "/" +
+                        string.Join("/", item.Path.Split('/').Select(Uri.EscapeDataString)),
+                    Destination = temporary
+                });
+                File.Move(temporary, path);
+            }
+            finally { if (File.Exists(temporary)) File.Delete(temporary); }
         }
 
         private async Task<string> EnsureKitSnapshot()
