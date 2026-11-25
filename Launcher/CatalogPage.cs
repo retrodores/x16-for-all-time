@@ -11,6 +11,7 @@ namespace CommanderX16
     internal sealed partial class MainForm
     {
         private readonly TextBox catalogSearch = Entry();
+        private readonly CheckBox downloadableOnly = new CheckBox { Text = "Downloadable only", AutoSize = true };
         private readonly ListBox catalogList = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
         private readonly TextBox catalogDetails = new TextBox
         {
@@ -39,6 +40,7 @@ namespace CommanderX16
             catalogSearch.AccessibleName = "Find a catalog program";
             catalogList.AccessibleName = "X16 Files programs";
             AddRow(body, Pair("Find a program", catalogSearch, refreshCatalog));
+            AddRow(body, downloadableOnly);
             AddRow(body, catalogList, SizeType.Percent, 100);
             AddRow(body, catalogDetails, SizeType.Absolute, 112);
             AddRow(body, Flow(openProject, installProgram, downloadProgram, catalogActivity));
@@ -51,6 +53,7 @@ namespace CommanderX16
             };
             refreshCatalog.Click += async (sender, args) => await LoadCatalog();
             catalogSearch.TextChanged += (sender, args) => ShowCatalogPrograms();
+            downloadableOnly.CheckedChanged += (sender, args) => ShowCatalogPrograms();
             catalogList.SelectedIndexChanged += (sender, args) => UpdateCatalogSelection();
             openProject.Click += (sender, args) => Attempt(() =>
             {
@@ -93,8 +96,10 @@ namespace CommanderX16
             if (catalogPrograms == null) return;
             var id = (catalogList.SelectedItem as CatalogProgram)?.Id;
             var filter = catalogSearch.Text.Trim();
-            var entries = catalogPrograms.Where(program => new[] { program.ToString(), program.Category, program.Author?.Name }
-                .Any(value => value?.IndexOf(filter, StringComparison.CurrentCultureIgnoreCase) >= 0))
+            var entries = catalogPrograms
+                .Where(program => !downloadableOnly.Checked || program.Downloads.Length > 0)
+                .Where(program => new[] { program.ToString(), program.Category, program.Author?.Name }
+                    .Any(value => value?.IndexOf(filter, StringComparison.CurrentCultureIgnoreCase) >= 0))
                 .OrderBy(program => program.ToString(), StringComparer.CurrentCultureIgnoreCase)
                 .ThenBy(program => program.Id, StringComparer.Ordinal).ToArray();
             catalogList.BeginUpdate();
@@ -134,7 +139,7 @@ namespace CommanderX16
         {
             catalogBusy = busy;
             catalogActivity.Visible = busy;
-            refreshCatalog.Enabled = catalogSearch.Enabled = catalogList.Enabled = !busy;
+            refreshCatalog.Enabled = catalogSearch.Enabled = downloadableOnly.Enabled = catalogList.Enabled = !busy;
             if (message != null) catalogStatus.Text = message;
             UpdateCatalogSelection();
         }
