@@ -20,6 +20,7 @@ namespace CommanderX16
         private int launchAttempt;
         private readonly CheckBox saveGif = new CheckBox { Text = "Save GIF", AutoSize = true };
         private readonly TextBox gifFile = Entry();
+        private string gifEntryId;
         private readonly Button browseGif = Button("Browse…");
         private readonly Button startDefaults = Button("Start defaults…");
         private readonly Label launchConfiguration = new Label { AutoSize = true };
@@ -45,7 +46,7 @@ namespace CommanderX16
             gifFile.AccessibleName = "GIF output file";
             AddRow(startBody, Pair("", saveGif));
             browseGif.AccessibleName = "Browse for GIF output file";
-            AddRow(startBody, Pair("File (blank: demo.gif)", gifFile, browseGif));
+            AddRow(startBody, Pair("GIF destination", gifFile, browseGif));
             AddRow(startBody, launchConfiguration);
             AddRow(startBody, preview, SizeType.Absolute, 83);
             run.BackColor = Teal;
@@ -55,9 +56,15 @@ namespace CommanderX16
 
             saveGif.CheckedChanged += (sender, args) => RefreshPreview();
             gifFile.TextChanged += (sender, args) => RefreshPreview();
+            gifFile.Validated += (sender, args) => Attempt(SaveStartGifPath);
+            FormClosing += (sender, args) => Attempt(SaveStartGifPath);
             browseGif.Click += (sender, args) => Attempt(PickStartGif);
             search.TextChanged += (sender, args) => RefreshPrograms();
-            startMenu.SelectedIndexChanged += (sender, args) => RefreshPreview();
+            startMenu.SelectedIndexChanged += (sender, args) =>
+            {
+                LoadStartGifPath();
+                RefreshPreview();
+            };
             BuildStartContextMenu();
             startMenu.MouseDoubleClick += async (sender, args) =>
             {
@@ -150,6 +157,7 @@ namespace CommanderX16
             entry.Name = program.Name + " (copy)";
             entry.CatalogId = null;
             entry.SdKitSource = null;
+            entry.StartGifPath = null;
             EditLaunchSettings(entry, "Duplicate PRG entry", create: true);
         }
 
@@ -205,6 +213,27 @@ namespace CommanderX16
             }
         }
 
+        private void LoadStartGifPath()
+        {
+            var id = (startMenu.SelectedItem as ProgramEntry)?.Id;
+            if (id == gifEntryId) return;
+            Attempt(SaveStartGifPath);
+            gifEntryId = id;
+            gifFile.Text = store.Data.Programs.FirstOrDefault(entry => entry.Id == id)?.StartGifPath ?? "";
+        }
+
+        private void SaveStartGifPath()
+        {
+            if (gifEntryId == null) return;
+            var entry = store.Data.Programs.FirstOrDefault(program => program.Id == gifEntryId);
+            var path = string.IsNullOrWhiteSpace(gifFile.Text) ? null : gifFile.Text.Trim();
+            if (entry == null || entry.StartGifPath == path) return;
+            store.Save(data => data.Programs.Single(program => program.Id == gifEntryId).StartGifPath = path);
+        }
+
+        private static string DefaultStartGifName(ProgramEntry program) =>
+            "capture-" + program.Id + ".gif";
+
         private void PickStartGif()
         {
             var program = startMenu.SelectedItem as ProgramEntry;
@@ -215,7 +244,7 @@ namespace CommanderX16
                 Title = "Save GIF recording",
                 Filter = "GIF recording (*.gif;*.gi)|*.gif;*.gi",
                 DefaultExt = "gif",
-                FileName = "demo.gif",
+                FileName = DefaultStartGifName(program),
                 InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
                 OverwritePrompt = false
             })
@@ -235,7 +264,11 @@ namespace CommanderX16
                     catch (Exception error) when (error is ArgumentException || error is NotSupportedException ||
                         error is PathTooLongException) { }
                 }
-                if (dialog.ShowDialog(this) == DialogResult.OK) gifFile.Text = dialog.FileName;
+                if (dialog.ShowDialog(this) == DialogResult.OK)
+                {
+                    gifFile.Text = dialog.FileName;
+                    SaveStartGifPath();
+                }
             }
         }
 
@@ -243,7 +276,11 @@ namespace CommanderX16
         {
             var options = store.Data.LaunchOptions(program);
             if (saveGif.Checked)
-                options = Launch.WithGifOverride(options, emulator, gifFile.Text);
+            {
+                var output = program.Id == gifEntryId ? gifFile.Text : program.StartGifPath;
+                options = Launch.WithGifOverride(options, emulator,
+                    string.IsNullOrWhiteSpace(output) ? DefaultStartGifName(program) : output);
+            }
             return Launch.Prepare(emulator, options, program.Path, validate, program.SdKitRoot);
         }
 

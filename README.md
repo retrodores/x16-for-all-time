@@ -10,7 +10,7 @@ Use **Launch settings** to edit the selected PRG's name, path, and launch settin
 
 Selecting an emulator fills the form from that build's default profile or emulator defaults. Select a different profile to prefill its values. Save a copy of the resulting configuration or choose **Use Start defaults** to let the entry follow the Start list's defaults. An entry whose emulator was removed requires reassignment.
 
-Use **Add PRG** or **Edit PRG** to set the name, path, and launch settings in one dialog. Browse for a PRG, a plain-text BASIC program, or a ZIP. The launcher keeps ZIP contents together and asks which PRG or BAS to use when there are several. **Duplicate entry** copies those fields into a new entry. **Remove from list** keeps the program file on disk. A relative GIF output path is resolved against the PRG’s folder. On Start, **Save GIF** overrides the recording filename for launches while checked. Use **Browse** to choose the destination. The picker opens on the Desktop when the field is blank. Leaving the field blank saves `demo.gif` in the PRG’s folder. The PRG’s saved settings stay intact.
+Use **Add PRG** or **Edit PRG** to set the name, path, and launch settings in one dialog. Browse for a PRG, a plain-text BASIC program, or a ZIP. The launcher keeps ZIP contents together and asks which PRG or BAS to use when there are several. **Duplicate entry** copies those fields into a new entry. **Remove from list** keeps the program file on disk. A relative GIF output path is resolved against the PRG’s folder. On Start, **Save GIF** overrides the recording filename for launches while checked. Use **Browse** to choose the destination. The picker opens on the Desktop when the field is blank. Each Start entry remembers its own destination. Leaving the field blank uses a filename based on the entry ID in the program’s folder. The PRG’s saved settings stay intact.
 
 ## X16 Files
 
@@ -20,7 +20,7 @@ Browse the X16 Files catalog, open a project page, or choose **Install to Start*
 
 ## SD Card Kit
 
-Browse the Commander X16 SD Card Starter Kit as a folder tree. Search by file or folder path, use **Refresh from GitHub** to fetch the current listing, or open a selected item on GitHub. Double-click a PRG, BAS, or ZIP, or choose **Add to Start**. The first import downloads the kit for that revision so that programs can access companion files. Later imports reuse the local copy. ZIPs offer a startup picker when they contain multiple PRG or BAS files.
+Browse the Commander X16 SD Card Starter Kit as a folder tree. Search by program or folder path and use **Refresh from SD Card Kit** to fetch the current listing. The tree shows PRGs, BAS files, ZIP packages, and the folders that contain them. Use **Install to Start**, **Reinstall to Start**, or **Download and launch**. Double-click a program to install or reinstall it. The first import downloads the kit for that revision so that programs can access companion files. Later imports reuse the local copy. ZIPs offer a startup picker when they contain multiple PRG or BAS files.
 
 ## Emulators and profiles
 
