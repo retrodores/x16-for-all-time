@@ -64,7 +64,7 @@ namespace CommanderX16
             pages.TabPages.AddRange(new[] { start, emulatorPage, catalogPage });
             AddRow(layout, pages, SizeType.Percent, 100);
             BuildStartPage(start, pages);
-            BuildCatalogPage(catalogPage, pages);
+            BuildCatalogPage(catalogPage, pages, start);
 
             var emulatorBody = Table();
             emulatorBody.AutoSize = false;

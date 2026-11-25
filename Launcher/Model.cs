@@ -270,6 +270,7 @@ namespace CommanderX16
         [DataMember] public string EmulatorId;
         [DataMember] public string ProfileId;
         [DataMember] public bool RequiresEmulatorSelection;
+        [DataMember(EmitDefaultValue = false)] public string CatalogId;
         [DataMember] public Profile Options;
         public override string ToString() => Name;
     }

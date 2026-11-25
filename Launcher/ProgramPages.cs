@@ -119,6 +119,7 @@ namespace CommanderX16
             var entry = Json.Read<ProgramEntry>(Json.Write(program));
             entry.Id = Guid.NewGuid().ToString("N");
             entry.Name = program.Name + " (copy)";
+            entry.CatalogId = null;
             EditLaunchSettings(entry, "Duplicate PRG entry", create: true);
         }
 
@@ -136,6 +137,7 @@ namespace CommanderX16
                 {
                     var entry = create ? program : data.Programs.Single(item => item.Id == program.Id);
                     entry.Name = dialog.EntryName;
+                    if (!Same(entry.Path, dialog.ProgramPath)) entry.CatalogId = null;
                     entry.Path = dialog.ProgramPath;
                     entry.EmulatorId = dialog.UseStartDefaults ? null : dialog.Emulator?.Id;
                     entry.Options = dialog.UseStartDefaults ? null : dialog.Options;

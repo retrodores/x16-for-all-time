@@ -34,9 +34,9 @@ namespace CommanderX16
             (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp) &&
             uri.Host.Length != 0 && uri.UserInfo.Length == 0;
 
-        public static async Task<string> Download(CatalogProgram program, IProgress<string> progress)
+        public static async Task<string> Download(CatalogProgram program, CatalogPackage package, IProgress<string> progress,
+            Func<string[], string> choosePrg)
         {
-            var package = program.Package;
             if (package?.Supported != true)
                 throw new IOException("This program has no supported package.");
 
@@ -58,7 +58,9 @@ namespace CommanderX16
                 if (archive)
                 {
                     progress.Report("Extracting " + program + "…");
-                    relative = await Task.Run(() => Extract(download, files, relative));
+                    var candidates = await Task.Run(() => ExtractCandidates(download, files, relative));
+                    relative = candidates.Length == 1 ? candidates[0] : choosePrg(candidates);
+                    if (relative == null) return null;
                 }
 
                 var destination = Path.Combine(parent, instance);
@@ -78,11 +80,11 @@ namespace CommanderX16
                 ? name : "program.prg";
         }
 
-        internal static string Extract(string archivePath, string directory, string entryPoint)
+        internal static string[] ExtractCandidates(string archivePath, string directory, string entryPoint)
         {
             var root = Path.GetFullPath(directory) + Path.DirectorySeparatorChar;
             var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            bool found = false;
+            var candidates = new List<string>();
             using (var archive = ZipFile.OpenRead(archivePath))
             {
                 foreach (var entry in archive.Entries)
@@ -111,13 +113,17 @@ namespace CommanderX16
                     {
                         Directory.CreateDirectory(Path.GetDirectoryName(path));
                         entry.ExtractToFile(path);
-                        found |= string.Equals(entry.FullName, entryPoint, StringComparison.Ordinal);
+                        if (string.IsNullOrEmpty(entryPoint)
+                            ? string.Equals(Path.GetExtension(relative), ".prg", StringComparison.OrdinalIgnoreCase)
+                            : string.Equals(name, entryPoint, StringComparison.Ordinal))
+                            candidates.Add(relative);
                     }
                 }
             }
-            if (!found)
-                throw new IOException("The ZIP does not contain the exact PRG path " + entryPoint + ".");
-            return entryPoint.Replace('/', Path.DirectorySeparatorChar);
+            if (candidates.Count == 0)
+                throw new IOException(string.IsNullOrEmpty(entryPoint) ? "The ZIP contains no PRG files." :
+                    "The ZIP does not contain the exact PRG path " + entryPoint + ".");
+            return candidates.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
         }
 
         private static readonly Regex DeviceName = new Regex(
@@ -142,6 +148,11 @@ namespace CommanderX16
         [DataMember(Name = "page_url")] public string PageUrl { get; set; }
         [DataMember(Name = "package")] public CatalogPackage Package { get; set; }
 
+        [DataMember(Name = "packages")] public CatalogPackage[] Packages { get; set; }
+
+        public CatalogPackage[] Downloads => (Packages ?? new[] { Package })
+            .Where(package => package?.Supported == true).ToArray();
+
         public override string ToString() => string.IsNullOrWhiteSpace(Name) ? Id : Name;
     }
 
@@ -159,6 +170,6 @@ namespace CommanderX16
         [DataMember(Name = "prg")] public string Prg { get; set; }
 
         public bool Supported => Catalog.IsWebUrl(Url) &&
-            (Format == "prg" || (Format == "zip" && Prg?.EndsWith(".prg", StringComparison.OrdinalIgnoreCase) == true));
+            (Format == "prg" || Format == "zip");
     }
 }
