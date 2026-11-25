@@ -66,7 +66,7 @@ namespace CommanderX16
             AddRow(layout, pages, SizeType.Percent, 100);
             BuildStartPage(start, pages);
             BuildCatalogPage(catalogPage, pages, start);
-            BuildKitPage(kitPage, pages);
+            BuildKitPage(kitPage, pages, start);
 
             var emulatorBody = Table();
             emulatorBody.AutoSize = false;

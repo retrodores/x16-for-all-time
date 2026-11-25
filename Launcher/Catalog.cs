@@ -80,16 +80,34 @@ namespace CommanderX16
                 ? name : "program.prg";
         }
 
-        internal static string[] ExtractCandidates(string archivePath, string directory, string entryPoint)
+        internal static string[] ExtractCandidates(string archivePath, string directory, string entryPoint,
+            bool includeBasic = false)
+        {
+            var candidates = ExtractArchive(archivePath, directory)
+                .Where(path => string.IsNullOrEmpty(entryPoint)
+                    ? includeBasic ? Launch.IsProgramFile(path) :
+                        string.Equals(Path.GetExtension(path), ".prg", StringComparison.OrdinalIgnoreCase)
+                    : string.Equals(path.Replace('\\', '/'), entryPoint, StringComparison.Ordinal))
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
+            if (candidates.Length == 0)
+                throw new IOException(string.IsNullOrEmpty(entryPoint)
+                    ? includeBasic ? "The ZIP contains no PRG or BAS files." : "The ZIP contains no PRG files."
+                    : "The ZIP does not contain the exact PRG path " + entryPoint + ".");
+            return candidates;
+        }
+
+        internal static List<string> ExtractArchive(string archivePath, string directory, string prefix = "")
         {
             var root = Path.GetFullPath(directory) + Path.DirectorySeparatorChar;
             var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var candidates = new List<string>();
+            var files = new List<string>();
             using (var archive = ZipFile.OpenRead(archivePath))
             {
                 foreach (var entry in archive.Entries)
                 {
                     string name = entry.FullName.Replace('\\', '/');
+                    if (!name.StartsWith(prefix, StringComparison.Ordinal) || name.Length == prefix.Length) continue;
+                    name = name.Substring(prefix.Length);
                     bool isFolder = name.EndsWith("/", StringComparison.Ordinal);
                     string[] parts = (isFolder ? name.Substring(0, name.Length - 1) : name).Split('/');
                     if (parts.Any(part => !ValidComponent(part)))
@@ -113,17 +131,11 @@ namespace CommanderX16
                     {
                         Directory.CreateDirectory(Path.GetDirectoryName(path));
                         entry.ExtractToFile(path);
-                        if (string.IsNullOrEmpty(entryPoint)
-                            ? string.Equals(Path.GetExtension(relative), ".prg", StringComparison.OrdinalIgnoreCase)
-                            : string.Equals(name, entryPoint, StringComparison.Ordinal))
-                            candidates.Add(relative);
+                        files.Add(relative);
                     }
                 }
             }
-            if (candidates.Count == 0)
-                throw new IOException(string.IsNullOrEmpty(entryPoint) ? "The ZIP contains no PRG files." :
-                    "The ZIP does not contain the exact PRG path " + entryPoint + ".");
-            return candidates.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
+            return files;
         }
 
         private static readonly Regex DeviceName = new Regex(

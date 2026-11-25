@@ -271,6 +271,8 @@ namespace CommanderX16
         [DataMember] public string ProfileId;
         [DataMember] public bool RequiresEmulatorSelection;
         [DataMember(EmitDefaultValue = false)] public string CatalogId;
+        [DataMember(EmitDefaultValue = false)] public string SdKitSource;
+        [DataMember(EmitDefaultValue = false)] public string SdKitRoot;
         [DataMember] public Profile Options;
         public override string ToString() => Name;
     }
@@ -386,16 +388,23 @@ namespace CommanderX16
 
     internal static class Launch
     {
-        public static Request Prepare(Emulator emulator, Profile profile, string program, bool validate)
+        internal static bool IsBasicProgram(string path) =>
+            string.Equals(Path.GetExtension(path), ".bas", StringComparison.OrdinalIgnoreCase);
+
+        internal static bool IsProgramFile(string path) =>
+            IsBasicProgram(path) || string.Equals(Path.GetExtension(path), ".prg", StringComparison.OrdinalIgnoreCase);
+
+        public static Request Prepare(Emulator emulator, Profile profile, string program, bool validate, string kitRoot = null)
         {
             if (emulator == null || string.IsNullOrWhiteSpace(program))
-                throw new InvalidOperationException("Choose an emulator and a PRG.");
+                throw new InvalidOperationException("Choose an emulator and a program file.");
             string exe = Path.GetFullPath(emulator.Exe);
             string prg = Path.GetFullPath(program);
             string directory = Path.GetDirectoryName(prg);
-            if (!string.Equals(Path.GetExtension(prg), ".prg", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Choose a .prg file.");
-            if (prg.Contains(","))
+            if (!IsProgramFile(prg))
+                throw new InvalidOperationException("Choose a .prg or .bas file.");
+            bool basic = IsBasicProgram(prg);
+            if (!basic && prg.Contains(","))
                 throw new InvalidOperationException("Move or rename the PRG so its path contains no comma. X16Emu uses a comma to specify a load address.");
             if (validate)
             {
@@ -405,11 +414,20 @@ namespace CommanderX16
                     throw new IOException("The official R49 Win32 ZIP is missing libgcc_s_dw2-1.dll. " +
                         (Environment.Is64BitOperatingSystem ? "Install R49 Win64 and select it for this program." :
                         "Select a working Win32 build."));
-                CheckPath(prg, "PRG");
+                CheckPath(prg, "Program file");
                 CheckPath(directory, "Working directory", true);
             }
 
-            var args = new List<string> { "-prg", prg };
+            var extra = profile.Extra ?? emulator.Extra;
+            if (kitRoot != null && emulator.UpstreamOptions && string.IsNullOrWhiteSpace(profile.FsRoot) &&
+                string.IsNullOrWhiteSpace(profile.SdCard) && !HasExtraOption(extra, "-fsroot") &&
+                !HasExtraOption(extra, "-sdcard"))
+            {
+                profile = Profile.CopyOptions(profile, emulator);
+                profile.FsRoot = kitRoot;
+            }
+
+            var args = new List<string> { basic ? "-bas" : "-prg", prg };
             if (profile.AutoRun)
                 args.Add("-run");
             string options = OptionArguments(emulator, profile, directory, validate);

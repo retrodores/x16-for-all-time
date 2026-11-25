@@ -114,7 +114,12 @@ try {
     $request = [IO.File]::ReadAllText($RequestFile, $utf8) | ConvertFrom-Json
     if ($request.Action -eq 'SdCardTree') {
         $headers = @{ 'User-Agent' = 'X16ForAllTime'; Accept = 'application/vnd.github+json'; 'Cache-Control' = 'no-cache' }
-        Invoke-WebRequest -UseBasicParsing -TimeoutSec 30 -Uri 'https://api.github.com/repos/cx16forum/sdcard/git/trees/main?recursive=1' -Headers $headers -OutFile $ResultFile
+        $repoApi = 'https://api.github.com/repos/cx16forum/sdcard'
+        $revision = (Invoke-RestMethod -UseBasicParsing -TimeoutSec 30 -Uri "$repoApi/git/ref/heads/main" -Headers $headers).object.sha
+        if ($revision -cnotmatch '^[0-9a-f]{40}$') { throw 'GitHub returned an invalid SD Card Kit revision.' }
+        $tree = Invoke-RestMethod -UseBasicParsing -TimeoutSec 30 -Uri "$repoApi/git/trees/${revision}?recursive=1" -Headers $headers
+        $listing = @{ revision = $revision; tree = $tree.tree; truncated = $tree.truncated }
+        [IO.File]::WriteAllText($ResultFile, ($listing | ConvertTo-Json -Depth 5 -Compress), $utf8)
         exit 0
     }
     if ($request.Action -eq 'Catalog') {
@@ -125,6 +130,7 @@ try {
     }
     $result = switch ($request.Action) {
         'Download' { Download-X16File $request.Url $request.Destination 120; @{} }
+        'SdCardArchive' { Download-X16File $request.Url $request.Destination 300; @{} }
         'List' { @{ Releases = @(Get-X16Releases) } }
         'Install' { Install-X16Release $request.Release $request.Destination $request.Overwrite }
         default { throw 'Unknown launcher operation.' }

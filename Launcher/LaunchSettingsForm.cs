@@ -263,7 +263,7 @@ namespace CommanderX16
             string path;
             using (var dialog = new OpenFileDialog
             {
-                Filter = "Commander X16 programs (*.prg;*.zip)|*.prg;*.zip"
+                Filter = "Commander X16 programs (*.prg;*.bas;*.zip)|*.prg;*.bas;*.zip"
             })
             {
                 if (dialog.ShowDialog(this) != DialogResult.OK) return;
@@ -284,10 +284,10 @@ namespace CommanderX16
                     confirm.Enabled = false;
                     preview.Text = "Extracting ZIP…";
                     extracted = Path.Combine(SettingsStore.Home, "LocalPrograms", Guid.NewGuid().ToString("N"));
-                    string[] candidates = await Task.Run(() => Catalog.ExtractCandidates(path, extracted, null));
+                    string[] candidates = await Task.Run(() => Catalog.ExtractCandidates(path, extracted, null, includeBasic: true));
                     if (IsDisposed) return;
                     int selected = candidates.Length == 1 ? 0 :
-                        LauncherDialogs.SelectItem(this, "Choose the startup PRG", candidates);
+                        LauncherDialogs.SelectItem(this, "Choose the startup program", candidates);
                     if (selected < 0) return;
                     path = Path.Combine(extracted, candidates[selected]);
                 }
@@ -373,15 +373,16 @@ namespace CommanderX16
                 if (program != null)
                 {
                     if (string.IsNullOrWhiteSpace(prgPath.Text) ||
-                        !string.Equals(Path.GetExtension(ProgramPath), ".prg", StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidOperationException("Choose a .prg file.");
+                        !Launch.IsProgramFile(ProgramPath))
+                        throw new InvalidOperationException("Choose a .prg or .bas file.");
                     if (EntryName.Length == 0) throw new InvalidOperationException("Enter a PRG name.");
                     var emulator = UseStartDefaults ? settings.FindEmulator(settings.StartEmulatorId) : Emulator;
                     var launchOptions = UseStartDefaults ? settings.StartOptions ?? new Profile() : options;
                     preview.Text = emulator == null
                         ? (UseStartDefaults ? "Set an emulator in Start defaults before launching." :
                             "Settings can be saved. Choose an emulator before launching.")
-                        : CommandPreview(Launch.Prepare(emulator, launchOptions, ProgramPath, false));
+                        : CommandPreview(Launch.Prepare(emulator, launchOptions, ProgramPath, false,
+                            Same(program.Path, ProgramPath) ? program.SdKitRoot : null));
                 }
                 else
                 {

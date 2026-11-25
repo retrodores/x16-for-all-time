@@ -149,6 +149,7 @@ namespace CommanderX16
             entry.Id = Guid.NewGuid().ToString("N");
             entry.Name = program.Name + " (copy)";
             entry.CatalogId = null;
+            entry.SdKitSource = null;
             EditLaunchSettings(entry, "Duplicate PRG entry", create: true);
         }
 
@@ -166,7 +167,12 @@ namespace CommanderX16
                 {
                     var entry = create ? program : data.Programs.Single(item => item.Id == program.Id);
                     entry.Name = dialog.EntryName;
-                    if (!Same(entry.Path, dialog.ProgramPath)) entry.CatalogId = null;
+                    if (!Same(entry.Path, dialog.ProgramPath))
+                    {
+                        entry.CatalogId = null;
+                        entry.SdKitSource = null;
+                        entry.SdKitRoot = null;
+                    }
                     entry.Path = dialog.ProgramPath;
                     entry.EmulatorId = dialog.UseStartDefaults ? null : dialog.Emulator?.Id;
                     entry.Options = dialog.UseStartDefaults ? null : dialog.Options;
@@ -238,7 +244,7 @@ namespace CommanderX16
             var options = store.Data.LaunchOptions(program);
             if (saveGif.Checked)
                 options = Launch.WithGifOverride(options, emulator, gifFile.Text);
-            return Launch.Prepare(emulator, options, program.Path, validate);
+            return Launch.Prepare(emulator, options, program.Path, validate, program.SdKitRoot);
         }
 
         internal static string CommandPreview(Request request) =>
@@ -250,8 +256,10 @@ namespace CommanderX16
             var program = startMenu.SelectedItem as ProgramEntry;
             var emulator = program == null ? null : store.Data.LaunchEmulator(program);
             UpdateCatalogSelection();
+            UpdateKitSelection();
             run.Enabled = false;
-            run.Text = program != null && store.Data.LaunchOptions(program).AutoRun ? "Run PRG" : "Load PRG";
+            var programType = Launch.IsBasicProgram(program?.Path) ? "BAS" : "PRG";
+            run.Text = (program != null && store.Data.LaunchOptions(program).AutoRun ? "Run " : "Load ") + programType;
             saveGif.Enabled = !launching && program != null;
             gifFile.Enabled = browseGif.Enabled = saveGif.Enabled && saveGif.Checked;
             startDefaults.Enabled = !launching && store.Data.Emulators.Count != 0;
@@ -267,7 +275,7 @@ namespace CommanderX16
                 try
                 {
                     var command = Prepare(program, emulator, true);
-                    run.Text = Launch.HasExtraOption(command.Arguments, "-run") ? "Run PRG" : "Load PRG";
+                    run.Text = (Launch.HasExtraOption(command.Arguments, "-run") ? "Run " : "Load ") + programType;
                     run.Enabled = copy.Enabled = !launching;
                     preview.Text = CommandPreview(command);
                 }
