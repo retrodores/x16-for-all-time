@@ -45,7 +45,8 @@ namespace CommanderX16
 
             var title = new Label
             {
-                Text = Text, Font = new Font("Segoe UI Semibold", 20),
+                Text = Program.Title + " " + typeof(MainForm).Assembly.GetName().Version.ToString(3),
+                Font = new Font("Segoe UI Semibold", 20),
                 AutoSize = true, ForeColor = Navy, Margin = Padding.Empty
             };
             var header = Table();
