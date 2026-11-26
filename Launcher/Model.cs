@@ -24,6 +24,7 @@ namespace CommanderX16
         [DataMember] public List<Profile> Profiles = new List<Profile>();
         [DataMember] public List<ProgramEntry> Programs = new List<ProgramEntry>();
 
+        [DataMember] public bool RenamedDataDirectory = true;
         [DataMember] public bool StartOrderInitialized = true;
         [DataMember] public bool EntryOptionsMigrated = true;
         [DataMember] public bool GenericExtrasMigrated = true;
@@ -385,13 +386,20 @@ namespace CommanderX16
     internal sealed class SettingsStore : IDisposable
     {
         public static readonly string Home = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CommanderX16ForRightNow");
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "X16ForAllTime");
         private readonly string path;
         private readonly FileStream sessionLock;
         public Settings Data { get; private set; }
 
         public SettingsStore(string directory)
         {
+            string legacy = null;
+            if (MainForm.Same(directory, Home))
+            {
+                legacy = Path.Combine(Path.GetDirectoryName(Home), "CommanderX16ForRightNow");
+                if (!Directory.Exists(Home) && Directory.Exists(legacy))
+                    Directory.Move(legacy, Home);
+            }
             Directory.CreateDirectory(directory);
             path = Path.Combine(directory, "settings.json");
             sessionLock = new FileStream(Path.Combine(directory, "settings.lock"), FileMode.OpenOrCreate,
@@ -404,6 +412,8 @@ namespace CommanderX16
                     throw new InvalidDataException("Unsupported settings file. Your settings were left on disk.");
                 if (!Data.StartOrderInitialized || !Data.BuildDefaultsMigrated || !Data.RomCopiesMigrated || !Data.ProfileCopiesMigrated || !Data.GenericExtrasMigrated || !Data.EntryOptionsMigrated || Data.Programs == null)
                     Save(settings => settings.Upgrade());
+                if (legacy != null && !Data.RenamedDataDirectory && !Directory.Exists(legacy))
+                    MigratePaths(legacy, directory);
                 foreach (var emulator in Data.Emulators)
                     emulator.SerialOverlayVersion = SerialNetworkOverlay.Detect(emulator.Exe);
             }
@@ -412,6 +422,75 @@ namespace CommanderX16
                 sessionLock.Dispose();
                 throw;
             }
+        }
+
+        private void MigratePaths(string legacy, string directory)
+        {
+            string typo = Path.Combine(directory, "Emulatorsw");
+            string emulators = Path.Combine(directory, "Emulators");
+            if (Directory.Exists(typo) && !Directory.Exists(emulators))
+                Directory.Move(typo, emulators);
+            bool typoMoved = !Directory.Exists(typo) && Directory.Exists(emulators);
+
+            string UpdatePath(string value)
+            {
+                if (value == null) return null;
+                if (MainForm.Same(value, legacy)) return directory;
+                if (value.StartsWith(legacy + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                    value = directory + value.Substring(legacy.Length);
+                if (typoMoved && (MainForm.Same(value, typo) ||
+                    value.StartsWith(typo + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))
+                    return emulators + value.Substring(typo.Length);
+                return value;
+            }
+
+            string UpdateArguments(string value)
+            {
+                if (value == null) return null;
+                if (typoMoved)
+                    value = Regex.Replace(value, Regex.Escape(Path.Combine(legacy, "Emulatorsw") + Path.DirectorySeparatorChar),
+                        _ => emulators + Path.DirectorySeparatorChar, RegexOptions.IgnoreCase);
+                return Regex.Replace(value, Regex.Escape(legacy + Path.DirectorySeparatorChar),
+                    _ => directory + Path.DirectorySeparatorChar, RegexOptions.IgnoreCase);
+            }
+
+            void UpdateProfile(Profile profile)
+            {
+                if (profile == null) return;
+                profile.Prg = UpdatePath(profile.Prg);
+                profile.WorkingDirectory = UpdatePath(profile.WorkingDirectory);
+                profile.Rom = UpdatePath(profile.Rom);
+                profile.SdCard = UpdatePath(profile.SdCard);
+                profile.FsRoot = UpdatePath(profile.FsRoot);
+                profile.Gif = UpdatePath(profile.Gif);
+                profile.Extra = UpdateArguments(profile.Extra);
+            }
+
+            Save(settings =>
+            {
+                settings.InstallParent = UpdatePath(settings.InstallParent);
+                if (MainForm.Same(settings.InstallParent?.TrimEnd(Path.DirectorySeparatorChar), typo))
+                    settings.InstallParent = emulators;
+                foreach (var emulator in settings.Emulators)
+                {
+                    emulator.Exe = UpdatePath(emulator.Exe);
+                    emulator.InstallRoot = UpdatePath(emulator.InstallRoot);
+                    emulator.DefaultRom = UpdatePath(emulator.DefaultRom);
+                    emulator.Extra = UpdateArguments(emulator.Extra);
+                }
+                UpdateProfile(settings.StartOptions);
+                foreach (var profile in settings.Profiles) UpdateProfile(profile);
+                foreach (var program in settings.Programs)
+                {
+                    program.Path = UpdatePath(program.Path);
+                    program.SdKitRoot = UpdatePath(program.SdKitRoot);
+                    program.StartGifPath = UpdatePath(program.StartGifPath);
+                    if (program.PreviousInstall != null)
+                        program.PreviousInstall.Path = UpdatePath(program.PreviousInstall.Path);
+                    UpdateProfile(program.Options);
+                }
+                settings.RenamedDataDirectory = true;
+            });
         }
 
         public void Save(Action<Settings> change)

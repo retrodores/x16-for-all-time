@@ -3,7 +3,7 @@
     <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
     <OutputType>WinExe</OutputType>
     <RootNamespace>CommanderX16</RootNamespace>
-    <AssemblyName>CommanderX16ForRightNow</AssemblyName>
+    <AssemblyName>X16ForAllTime</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <OutputPath>bin\$(Configuration)\</OutputPath>
     <LangVersion>7.3</LangVersion>
