@@ -43,7 +43,7 @@ namespace CommanderX16
             FindEmulator(UsesStartDefaults(entry) ? StartEmulatorId : entry.EmulatorId);
 
         public Profile LaunchOptions(ProgramEntry entry) =>
-            (UsesStartDefaults(entry) ? StartOptions : entry.Options) ?? new Profile();
+            (UsesStartDefaults(entry) ? StartOptions : entry.Options) ?? Profile.CopyOptions(null, LaunchEmulator(entry));
 
         public void Upgrade()
         {
@@ -253,7 +253,11 @@ namespace CommanderX16
 
         public static Profile CopyOptions(Profile source, Emulator emulator, bool clearInactive = false)
         {
-            if (source == null) return new Profile();
+            if (source == null)
+                return new Profile
+                {
+                    Scale = emulator?.UpstreamOptions == true && !Launch.HasExtraOption(emulator.Extra, "-scale") ? "2" : null
+                };
             var copy = Json.Read<Profile>(Json.Write(source));
             if (clearInactive && emulator?.UpstreamOptions == false)
             {

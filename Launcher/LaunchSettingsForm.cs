@@ -395,7 +395,7 @@ namespace CommanderX16
                         throw new InvalidOperationException("Choose a .prg or .bas file.");
                     if (EntryName.Length == 0) throw new InvalidOperationException("Enter a PRG name.");
                     var emulator = UseStartDefaults ? settings.FindEmulator(settings.StartEmulatorId) : Emulator;
-                    var launchOptions = UseStartDefaults ? settings.StartOptions ?? new Profile() : options;
+                    var launchOptions = UseStartDefaults ? settings.StartOptions ?? Profile.CopyOptions(null, emulator) : options;
                     preview.Text = emulator == null
                         ? (UseStartDefaults ? "Set an emulator in Start defaults before launching." :
                             "Settings can be saved. Choose an emulator before launching.")
