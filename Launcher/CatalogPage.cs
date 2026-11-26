@@ -45,8 +45,8 @@ namespace CommanderX16
         {
             if (id == null) return;
             search.Clear();
-            RefreshPrograms(id);
             tabs.SelectedTab = start;
+            RefreshPrograms(id);
             var added = store.Data.Programs.FirstOrDefault(entry => entry.Id == id);
             launchStatus.Text = added?.PreviousInstall != null && source == "X16 Files"
                 ? "Reinstalled. See the program menu for the previous copy."

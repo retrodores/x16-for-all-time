@@ -182,6 +182,19 @@ namespace CommanderX16
             }
             LoadStartGifPath();
             RefreshPreview();
+            if (select != null && startMenu.SelectedIndex >= 0)
+                ShowSelectedStartRow();
+        }
+
+        private void ShowSelectedStartRow()
+        {
+            int index = startMenu.SelectedIndex;
+            int first = startMenu.TopIndex;
+            int visibleRows = Math.Max(1, startMenu.ClientSize.Height / startMenu.ItemHeight);
+            if (index < first)
+                startMenu.TopIndex = index;
+            else if (index - first >= visibleRows)
+                startMenu.TopIndex = index - visibleRows + 1;
         }
 
         private void SetupFirstEmulator(Action setup)
