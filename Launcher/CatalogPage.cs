@@ -234,7 +234,7 @@ namespace CommanderX16
                     var entry = data.Programs.FirstOrDefault(item => item.CatalogId == program.Id);
                     if (entry == null)
                     {
-                        entry = new ProgramEntry { CatalogId = program.Id, Name = program.ToString() };
+                        entry = new ProgramEntry { CatalogId = program.Id, Name = data.UniqueProgramName(program.ToString(), program.Version) };
                         // Use the same default emulator fallback as a catalog launch.
                         if (data.FindEmulator(data.StartEmulatorId) == null && data.Emulators.Count == 1)
                         {

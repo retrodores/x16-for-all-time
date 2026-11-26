@@ -418,6 +418,13 @@ namespace CommanderX16
         {
             UpdatePreview();
             if (!confirm.Enabled) return;
+            if (program != null && settings.HasProgramName(EntryName, program.Id))
+            {
+                LauncherDialogs.Message(this, "This name is already in Start. Add a version or another distinguishing detail.", Text);
+                name.Focus();
+                name.SelectAll();
+                return;
+            }
             if (program == null && !builds.Enabled && (EntryName.Length == 0 || settings.Profiles.Any(profile =>
                 profile.Id != profileId && profile.EmulatorId == Emulator.Id && Same(profile.Name, EntryName))))
             {

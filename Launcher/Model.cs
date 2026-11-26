@@ -24,6 +24,7 @@ namespace CommanderX16
         [DataMember] public List<Profile> Profiles = new List<Profile>();
         [DataMember] public List<ProgramEntry> Programs = new List<ProgramEntry>();
 
+        [DataMember] public bool StartOrderInitialized = true;
         [DataMember] public bool EntryOptionsMigrated = true;
         [DataMember] public bool GenericExtrasMigrated = true;
         [DataMember] public bool ProfileCopiesMigrated = true;
@@ -45,9 +46,47 @@ namespace CommanderX16
         public Profile LaunchOptions(ProgramEntry entry) =>
             (UsesStartDefaults(entry) ? StartOptions : entry.Options) ?? Profile.CopyOptions(null, LaunchEmulator(entry));
 
+        public bool HasProgramName(string name, string exceptId = null) =>
+            Programs.Any(entry => entry.Id != exceptId && MainForm.Same(entry.Name?.Trim(), name.Trim()));
+
+        public string UniqueProgramName(string name, string version = null)
+        {
+            name = name.Trim();
+            if (!HasProgramName(name)) return name;
+            if (!string.IsNullOrWhiteSpace(version))
+            {
+                name += " (" + version.Trim() + ")";
+                if (!HasProgramName(name)) return name;
+            }
+            for (int number = 2; ; number++)
+            {
+                string candidate = $"{name} ({number})";
+                if (!HasProgramName(candidate)) return candidate;
+            }
+        }
+
+        private void InitializeStartOrder()
+        {
+            Programs = Programs.OrderBy(entry => entry.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(entry => entry.Path, StringComparer.OrdinalIgnoreCase).ToList();
+            var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in Programs)
+            {
+                string name = string.IsNullOrWhiteSpace(entry.Name) ? UniqueProgramName("Program") : entry.Name.Trim();
+                if (!used.Add(name))
+                {
+                    entry.Name = UniqueProgramName(name, entry.Source?.Version);
+                    used.Add(entry.Name);
+                }
+                else entry.Name = name;
+            }
+            StartOrderInitialized = true;
+        }
+
         public void Upgrade()
         {
             if (!EntryOptionsMigrated || Programs == null) MigrateEntryOptions();
+            if (!StartOrderInitialized) InitializeStartOrder();
             if (!GenericExtrasMigrated)
             {
                 foreach (var preset in Profiles)
@@ -363,7 +402,7 @@ namespace CommanderX16
                 Data = File.Exists(source) ? Json.Read<Settings>(File.ReadAllBytes(source)) : new Settings();
                 if (Data == null || Data.Format != 1 || Data.Emulators == null || Data.Profiles == null)
                     throw new InvalidDataException("Unsupported settings file. Your settings were left on disk.");
-                if (!Data.BuildDefaultsMigrated || !Data.RomCopiesMigrated || !Data.ProfileCopiesMigrated || !Data.GenericExtrasMigrated || !Data.EntryOptionsMigrated || Data.Programs == null)
+                if (!Data.StartOrderInitialized || !Data.BuildDefaultsMigrated || !Data.RomCopiesMigrated || !Data.ProfileCopiesMigrated || !Data.GenericExtrasMigrated || !Data.EntryOptionsMigrated || Data.Programs == null)
                     Save(settings => settings.Upgrade());
                 foreach (var emulator in Data.Emulators)
                     emulator.SerialOverlayVersion = SerialNetworkOverlay.Detect(emulator.Exe);
@@ -380,6 +419,9 @@ namespace CommanderX16
             Settings copy = Json.Read<Settings>(Json.Write(Data));
             change(copy);
             copy.EnsureDefaultProfiles();
+            if (copy.Programs.Any(entry => string.IsNullOrWhiteSpace(entry.Name)) ||
+                copy.Programs.Select(entry => entry.Name.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count() != copy.Programs.Count)
+                throw new InvalidOperationException("Give each Start program a distinct name.");
             string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {

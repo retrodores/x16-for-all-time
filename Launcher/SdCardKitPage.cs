@@ -169,7 +169,7 @@ namespace CommanderX16
                     var entry = data.Programs.FirstOrDefault(program => program.SdKitSource == item.Path);
                     if (entry == null)
                     {
-                        entry = new ProgramEntry { SdKitSource = item.Path, Name = Path.GetFileNameWithoutExtension(path) };
+                        entry = new ProgramEntry { SdKitSource = item.Path, Name = data.UniqueProgramName(Path.GetFileNameWithoutExtension(path)) };
                         if (data.FindEmulator(data.StartEmulatorId) == null && data.Emulators.Count == 1)
                         {
                             var emulator = data.Emulators[0];

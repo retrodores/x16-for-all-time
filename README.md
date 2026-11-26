@@ -4,6 +4,8 @@ A Windows launcher for running a library of Commander X16 programs with your cho
 
 ## Start
 
+Right-click an entry and choose **Move up** or **Move down** to set the saved Start order. Start names are unique. Add a version or another detail when renaming or adding a program with a name already in use.
+
 Choose **Browse X16 Files** to find a program or **Add a local program** to use one you have. If the selected program needs your first emulator, **Install emulator** and **Register existing** are available from Start.
 
 Double-click an entry or select **Run** to launch it. The entry's saved configuration takes priority. **Start defaults** supplies an emulator and settings for entries without a configuration. The preview identifies the settings in use and **Copy PowerShell** copies the same command. The working directory is always the PRG's containing folder.

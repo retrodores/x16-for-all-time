@@ -112,15 +112,19 @@ namespace CommanderX16
             var openPrevious = new ToolStripMenuItem("Open previous folder", null, (sender, args) =>
                 Attempt(() => Process.Start(new ProcessStartInfo(Path.GetDirectoryName(SelectedProgram.PreviousInstall.Path)) { UseShellExecute = true })));
             var revert = new ToolStripMenuItem("Revert to previous install…", null, (sender, args) => Attempt(RevertInstall));
+            var moveUp = new ToolStripMenuItem("Move up", null, (sender, args) => Attempt(() => MoveStartProgram(-1)));
+            var moveDown = new ToolStripMenuItem("Move down", null, (sender, args) => Attempt(() => MoveStartProgram(1)));
             var unlink = new ToolStripMenuItem("Remove from Start", null, (sender, args) => Attempt(RemoveStartEntries));
             var delete = new ToolStripMenuItem("Delete programs from disk…", null, (sender, args) => removeProgram.PerformClick());
             var items = actions.Select(button =>
                 new ToolStripMenuItem(button.Text, null, (sender, args) => button.PerformClick())).ToArray();
             contextMenu.Items.AddRange(items);
-            contextMenu.Items.AddRange(new ToolStripItem[] { new ToolStripSeparator(), info, openPrevious, revert, unlink, delete });
+            contextMenu.Items.AddRange(new ToolStripItem[] { new ToolStripSeparator(), moveUp, moveDown, info, openPrevious, revert, unlink, delete });
             contextMenu.Opening += (sender, args) =>
             {
                 args.Cancel = startMenu.SelectedItem == null;
+                moveUp.Enabled = !launching && SelectedProgram != null && startMenu.SelectedIndex > 0;
+                moveDown.Enabled = !launching && SelectedProgram != null && startMenu.SelectedIndex < startMenu.Items.Count - 1;
                 info.Enabled = SelectedProgram != null;
                 string previousPath = SelectedProgram?.PreviousInstall?.Path;
                 openPrevious.Enabled = previousPath != null && Directory.Exists(Path.GetDirectoryName(previousPath));
@@ -144,6 +148,23 @@ namespace CommanderX16
             startMenu.Disposed += (sender, args) => contextMenu.Dispose();
         }
 
+        private void MoveStartProgram(int direction)
+        {
+            string id = SelectedProgram?.Id;
+            int neighborIndex = startMenu.SelectedIndex + direction;
+            if (id == null || neighborIndex < 0 || neighborIndex >= startMenu.Items.Count) return;
+            string neighborId = ((ProgramEntry)startMenu.Items[neighborIndex]).Id;
+            store.Save(data =>
+            {
+                int from = data.Programs.FindIndex(entry => entry.Id == id);
+                int to = data.Programs.FindIndex(entry => entry.Id == neighborId);
+                var entryToMove = data.Programs[from];
+                data.Programs[from] = data.Programs[to];
+                data.Programs[to] = entryToMove;
+            });
+            RefreshPrograms(id);
+        }
+
         private static TableLayoutPanel PageBody(TabPage page)
         {
             var body = Table();
@@ -161,9 +182,7 @@ namespace CommanderX16
             string filter = search.Text.Trim();
             var entries = store.Data.Programs.Where(p =>
                 p.Name.IndexOf(filter, StringComparison.CurrentCultureIgnoreCase) >= 0 ||
-                p.Path.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
-                .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
-                .ThenBy(p => p.Path, StringComparer.OrdinalIgnoreCase).ToArray();
+                p.Path.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0).ToArray();
             updatingStartSelection = true;
             startMenu.BeginUpdate();
             try
@@ -341,7 +360,7 @@ namespace CommanderX16
             var program = SelectedProgram;
             var entry = Json.Read<ProgramEntry>(Json.Write(program));
             entry.Id = Guid.NewGuid().ToString("N");
-            entry.Name = program.Name + " (copy)";
+            entry.Name = store.Data.UniqueProgramName(program.Name + " (copy)");
             entry.CatalogId = null;
             entry.SdKitSource = null;
             entry.StartGifPath = null;
