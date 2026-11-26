@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -8,7 +9,7 @@ namespace CommanderX16
 {
     internal sealed partial class MainForm : Form
     {
-        private static readonly Color Navy = Color.FromArgb(20, 36, 57);
+        private static Color Navy => SystemInformation.HighContrast ? SystemColors.WindowText : Color.FromArgb(20, 36, 57);
         private static readonly Color Teal = Color.FromArgb(24, 113, 110);
         private readonly SettingsStore store;
         private readonly ComboBox emulators = Combo(), profiles = Combo();
@@ -33,7 +34,7 @@ namespace CommanderX16
             MinimumSize = new Size(700, 630);
             ClientSize = new Size(880, 770);
             StartPosition = FormStartPosition.CenterScreen;
-            BackColor = Color.FromArgb(234, 241, 241);
+            BackColor = SystemInformation.HighContrast ? SystemColors.Control : Color.FromArgb(234, 241, 241);
 
             var layout = Table();
             layout.AutoSize = false;
@@ -65,7 +66,7 @@ namespace CommanderX16
             var kitPage = new TabPage("SD Card Kit") { Padding = new Padding(12) };
             pages.TabPages.AddRange(new[] { start, catalogPage, kitPage, emulatorPage });
             AddRow(layout, pages, SizeType.Percent, 100);
-            BuildStartPage(start, pages);
+            BuildStartPage(start, pages, catalogPage);
             BuildCatalogPage(catalogPage, pages, start);
             BuildKitPage(kitPage, pages, start);
 
@@ -333,7 +334,7 @@ namespace CommanderX16
             using (var dialog = new Form
             {
                 Text = "About " + Program.Title, Font = Font,
-                AutoScaleMode = AutoScaleMode.Dpi, ClientSize = new Size(560, 310),
+                AutoScaleMode = AutoScaleMode.Dpi, ClientSize = new Size(560, 345),
                 StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false, MinimizeBox = false, ShowInTaskbar = false
             })
@@ -365,7 +366,9 @@ namespace CommanderX16
                     AutoSize = true, Margin = new Padding(0, 0, 0, 12)
                 });
                 AddRow(body, new Label { Text = "Project and credits", Font = sectionFont, AutoSize = true });
-                AddRow(body, AboutLink("Source and releases", "https://github.com/retrodores/x16-for-now"));
+                AddRow(body, AboutLink("Source and releases", "https://github.com/retrodores/x16-for-all-time"));
+                AddRow(body, AboutLink("Report a launcher issue", IssueUrl("https://github.com/retrodores/x16-for-all-time",
+                    "Launcher issue", null)));
                 AddRow(body, AboutLink("Retrodores on GitHub", "https://github.com/retrodores"));
                 AddRow(body, AboutLink("Commander X16 emulator", "https://github.com/X16Community/x16-emulator"));
                 AddRow(body, new Panel(), SizeType.Percent, 100);
@@ -379,6 +382,18 @@ namespace CommanderX16
                 LauncherDialogs.Show(dialog, this);
             }
         }
+
+        private static string IssueUrl(string repo, string title, string programId)
+        {
+            var version = typeof(MainForm).Assembly.GetName().Version.ToString(3);
+            var body = "F.A.T. version: " + version + Environment.NewLine +
+                (programId == null ? "" : "Catalog ID: " + programId + Environment.NewLine) +
+                Environment.NewLine + "Describe what happened and what you expected:";
+            return repo + "/issues/new?title=" + Uri.EscapeDataString(title) + "&body=" + Uri.EscapeDataString(body);
+        }
+
+        private static void OpenReport(string repo, string title, string programId) =>
+            Process.Start(new ProcessStartInfo(IssueUrl(repo, title, programId)) { UseShellExecute = true });
 
         private LinkLabel AboutLink(string text, string url)
         {
@@ -449,7 +464,7 @@ namespace CommanderX16
 
         internal static FlowLayoutPanel Flow(params Control[] children)
         {
-            var panel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Dock = DockStyle.Fill, Margin = Padding.Empty };
+            var panel = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Dock = DockStyle.Fill, Margin = Padding.Empty };
             panel.Controls.AddRange(children);
             return panel;
         }

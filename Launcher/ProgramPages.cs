@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Windows.Forms.Automation;
 
 namespace CommanderX16
 {
@@ -13,7 +15,8 @@ namespace CommanderX16
         private readonly TextBox search = Entry();
         private readonly ListBox startMenu = new ListBox
         {
-            Dock = DockStyle.Fill, IntegralHeight = false, SelectionMode = SelectionMode.MultiExtended
+            Dock = DockStyle.Fill, IntegralHeight = false, SelectionMode = SelectionMode.MultiExtended,
+            AccessibleName = "Start programs"
         };
         private bool updatingStartSelection;
         private ProgramEntry SelectedProgram => startMenu.SelectedItems.Count == 1
@@ -32,9 +35,13 @@ namespace CommanderX16
         private readonly Button startDefaults = Button("Start defaults…");
         private readonly Label launchConfiguration = new Label { AutoSize = true };
         private readonly Button duplicate = Button("Duplicate entry…"),
-            removeProgram = Button("Delete programs…");
+            removeProgram = Button("Delete files…");
+        private readonly Button browsePrograms = Button("Browse X16 Files");
+        private readonly Button installStartEmulator = Button("Install emulator…");
+        private readonly Button registerStartEmulator = Button("Register existing…");
+        private readonly Label selectionStatus = new Label { AutoSize = true, LiveSetting = AutomationLiveSetting.Polite };
 
-        private void BuildStartPage(TabPage start, TabControl tabs)
+        private void BuildStartPage(TabPage start, TabControl tabs, TabPage catalogPage)
         {
             var startBody = PageBody(start);
             var headline = new Label
@@ -43,12 +50,20 @@ namespace CommanderX16
                 ForeColor = Navy, AutoSize = true
             };
             AddRow(startBody, headline);
-            AddRow(startBody, Pair("Find a PRG", search, Button("Add PRG…", () =>
-                EditLaunchSettings(new ProgramEntry(), "Add PRG", create: true)), startDefaults));
-            startMenu.BackColor = Navy;
-            startMenu.ForeColor = Color.White;
+            AddRow(startBody, Pair("Find a program", search));
+            search.AccessibleName = "Find a Start program";
+            preview.AccessibleName = "Emulator command preview";
+            AddRow(startBody, Flow(Button("Add a local program…", () =>
+                EditLaunchSettings(new ProgramEntry(), "Add a local program", create: true)), browsePrograms, startDefaults));
+            AddRow(startBody, Flow(installStartEmulator, registerStartEmulator));
+            browsePrograms.Click += (sender, args) => tabs.SelectedTab = catalogPage;
+            installStartEmulator.Click += (sender, args) => SetupFirstEmulator(ShowInstall);
+            registerStartEmulator.Click += (sender, args) => SetupFirstEmulator(() => EditEmulator(null));
+            startMenu.BackColor = SystemColors.Window;
+            startMenu.ForeColor = SystemColors.WindowText;
             startMenu.Font = new Font("Segoe UI", 13);
             AddRow(startBody, startMenu, SizeType.Percent, 100);
+            AddRow(startBody, selectionStatus);
             AddRow(startBody, Flow(run, duplicate, removeProgram));
             gifFile.AccessibleName = "GIF output file";
             AddRow(startBody, Pair("", saveGif));
@@ -56,9 +71,6 @@ namespace CommanderX16
             AddRow(startBody, Pair("GIF destination", gifFile, browseGif));
             AddRow(startBody, launchConfiguration);
             AddRow(startBody, preview, SizeType.Absolute, 83);
-            run.BackColor = Teal;
-            run.ForeColor = Color.White;
-            run.FlatStyle = FlatStyle.Flat;
             AddRow(startBody, Flow(startSettings, copy, launchActivity, launchStatus));
 
             saveGif.CheckedChanged += (sender, args) => RefreshPreview();
@@ -95,13 +107,25 @@ namespace CommanderX16
         private void BuildStartContextMenu()
         {
             var contextMenu = new ContextMenuStrip();
-            var actions = new[] { run, startSettings, copy, duplicate, removeProgram };
+            var actions = new[] { run, startSettings, copy, duplicate };
+            var info = new ToolStripMenuItem("Program information…", null, (sender, args) => Attempt(ShowProgramInformation));
+            var openPrevious = new ToolStripMenuItem("Open previous folder", null, (sender, args) =>
+                Attempt(() => Process.Start(new ProcessStartInfo(Path.GetDirectoryName(SelectedProgram.PreviousInstall.Path)) { UseShellExecute = true })));
+            var revert = new ToolStripMenuItem("Revert to previous install…", null, (sender, args) => Attempt(RevertInstall));
+            var unlink = new ToolStripMenuItem("Remove from Start", null, (sender, args) => Attempt(RemoveStartEntries));
+            var delete = new ToolStripMenuItem("Delete programs from disk…", null, (sender, args) => removeProgram.PerformClick());
             var items = actions.Select(button =>
                 new ToolStripMenuItem(button.Text, null, (sender, args) => button.PerformClick())).ToArray();
             contextMenu.Items.AddRange(items);
+            contextMenu.Items.AddRange(new ToolStripItem[] { new ToolStripSeparator(), info, openPrevious, revert, unlink, delete });
             contextMenu.Opening += (sender, args) =>
             {
                 args.Cancel = startMenu.SelectedItem == null;
+                info.Enabled = SelectedProgram != null;
+                string previousPath = SelectedProgram?.PreviousInstall?.Path;
+                openPrevious.Enabled = previousPath != null && Directory.Exists(Path.GetDirectoryName(previousPath));
+                revert.Enabled = !launching && File.Exists(previousPath);
+                unlink.Enabled = delete.Enabled = removeProgram.Enabled;
                 for (int i = 0; i < actions.Length; i++)
                 {
                     items[i].Text = actions[i].Text;
@@ -160,6 +184,76 @@ namespace CommanderX16
             RefreshPreview();
         }
 
+        private void SetupFirstEmulator(Action setup)
+        {
+            Attempt(() =>
+            {
+                var id = SelectedProgram?.Id;
+                setup();
+                var emulator = store.Data.Emulators.Count == 1 ? store.Data.Emulators[0] : null;
+                if (id == null || emulator == null) return;
+                store.Save(data =>
+                {
+                    var entry = data.Programs.Single(item => item.Id == id);
+                    if (data.UsesStartDefaults(entry))
+                    {
+                        data.StartEmulatorId = emulator.Id;
+                        data.StartOptions = Profile.Snapshot(data.DefaultProfile(emulator), emulator);
+                    }
+                    else
+                    {
+                        entry.EmulatorId = emulator.Id;
+                        entry.RequiresEmulatorSelection = false;
+                    }
+                });
+                RefreshPrograms(id);
+                run.Focus();
+            });
+        }
+
+        private void RemoveStartEntries()
+        {
+            var ids = new HashSet<string>(startMenu.SelectedItems.Cast<ProgramEntry>().Select(entry => entry.Id));
+            store.Save(data => data.Programs.RemoveAll(entry => ids.Contains(entry.Id)));
+            RefreshPrograms();
+            launchStatus.Text = "Removed from Start";
+        }
+
+        private void ShowProgramInformation()
+        {
+            var entry = SelectedProgram;
+            var catalog = catalogPrograms?.FirstOrDefault(item => entry.CatalogId != null && item.Id == entry.CatalogId);
+            var source = entry.Source;
+            var url = source?.Url ?? catalog?.PageUrl;
+            var info = string.Join(Environment.NewLine, new[]
+            {
+                entry.Name, source?.Title ?? catalog?.Name, source?.Author ?? catalog?.Author?.Name,
+                source?.Version ?? catalog?.Version, entry.SdKitSource, Catalog.IsWebUrl(url) ? url : null, entry.Path
+            }.Where(value => !string.IsNullOrWhiteSpace(value)).Distinct());
+            if (!Catalog.IsWebUrl(url))
+                LauncherDialogs.Message(this, info, "Program information");
+            else if (LauncherDialogs.OfferBrowser(this, info, "Program information"))
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+
+        private void RevertInstall()
+        {
+            var selected = SelectedProgram;
+            if (!LauncherDialogs.Confirm(this, "Switch " + selected.Name + " to the previous program file?",
+                "Revert to previous install")) return;
+            store.Save(data =>
+            {
+                var entry = data.Programs.Single(item => item.Id == selected.Id);
+                var previous = entry.PreviousInstall;
+                if (!File.Exists(previous?.Path)) throw new IOException("The previous program file is missing.");
+                entry.RememberInstallation(previous.Path);
+                entry.Path = previous.Path;
+                entry.Source = previous.Source;
+            });
+            RefreshPrograms(selected.Id);
+            launchStatus.Text = "Switched to the previous installation";
+        }
+
         private void RemoveProgram()
         {
             var selected = startMenu.SelectedItems.Cast<ProgramEntry>().ToArray();
@@ -175,11 +269,10 @@ namespace CommanderX16
                 throw new IOException("These entries share the selected files. Select them too before deleting."
                     + Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, shared));
 
-            var names = selected.Length == 1 ? selected[0].Name : selected.Length + " selected entries";
-            var message = "Remove " + names + " from Start and permanently delete the following program files?"
-                + Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, paths.OrderBy(path => path))
-                + Environment.NewLine + Environment.NewLine + "Companion files and folders will stay on disk.";
-            if (!LauncherDialogs.Confirm(this, message, "Delete programs")) return;
+            var files = paths.Count == 1 ? "1 program file" : paths.Count + " program files";
+            var entries = selected.Length == 1 ? "1 Start entry" : selected.Length + " Start entries";
+            var summary = $"Permanently delete {files} and remove {entries}? Companion files stay on disk.";
+            if (!LauncherDialogs.ConfirmProgramDeletion(this, summary, paths.OrderBy(path => path).ToArray())) return;
 
             DeleteStartPrograms(ids, paths);
         }
@@ -239,6 +332,7 @@ namespace CommanderX16
             entry.CatalogId = null;
             entry.SdKitSource = null;
             entry.StartGifPath = null;
+            entry.PreviousInstall = null;
             EditLaunchSettings(entry, "Duplicate PRG entry", create: true);
         }
 
@@ -261,6 +355,8 @@ namespace CommanderX16
                         entry.CatalogId = null;
                         entry.SdKitSource = null;
                         entry.SdKitRoot = null;
+                        entry.Source = null;
+                        entry.PreviousInstall = null;
                     }
                     entry.Path = dialog.ProgramPath;
                     entry.EmulatorId = dialog.UseStartDefaults ? null : dialog.Emulator?.Id;
@@ -376,6 +472,16 @@ namespace CommanderX16
             UpdateCatalogSelection();
             UpdateKitSelection();
             run.Enabled = false;
+            browsePrograms.Visible = store.Data.Programs.Count == 0;
+            installStartEmulator.Visible = registerStartEmulator.Visible = program != null && store.Data.Emulators.Count == 0;
+            int count = startMenu.SelectedItems.Count;
+            var selection = count == 1 ? "1 program selected" : count + " programs selected";
+            selectionStatus.Visible = count > 0;
+            if (selectionStatus.Text != selection)
+            {
+                selectionStatus.Text = selection;
+                selectionStatus.AccessibilityObject.RaiseLiveRegionChanged();
+            }
             var programType = Launch.IsBasicProgram(program?.Path) ? "BAS" : "PRG";
             run.Text = (program != null && store.Data.LaunchOptions(program).AutoRun ? "Run " : "Load ") + programType;
             saveGif.Enabled = !launching && program != null;
@@ -387,8 +493,8 @@ namespace CommanderX16
             removeProgram.Enabled = !launching && startMenu.SelectedItems.Count > 0;
             copy.Enabled = false;
             if (startMenu.SelectedItems.Count > 1) preview.Text = startMenu.SelectedItems.Count + " programs selected.";
-            else if (program == null) preview.Text = store.Data.Programs.Count == 0 ? "Add a PRG to get started." : "No matching PRGs.";
-            else if (store.Data.Emulators.Count == 0) preview.Text = "Register or install an X16Emu build on the Emulators tab.";
+            else if (program == null) preview.Text = store.Data.Programs.Count == 0 ? "Browse X16 Files or add a local program to get started." : "No matching programs.";
+            else if (store.Data.Emulators.Count == 0) preview.Text = "Choose an emulator to run " + program.Name + ".";
             else if (emulator == null) preview.Text = MissingLaunchSetup(program);
             else
             {

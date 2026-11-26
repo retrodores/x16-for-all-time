@@ -16,6 +16,37 @@ namespace CommanderX16
         internal static bool Confirm(Form owner, string message, string title) =>
             ShowMessage(owner, message, title, "&Yes", "&No") == DialogResult.Yes;
 
+        internal static bool ConfirmProgramDeletion(Form owner, string summary, string[] paths)
+        {
+            using (var dialog = new Form
+            {
+                Text = "Delete programs from disk", Font = owner.Font, AutoScaleMode = AutoScaleMode.Dpi,
+                StartPosition = FormStartPosition.CenterParent, ClientSize = new Size(570, 310),
+                MinimumSize = new Size(440, 260), ShowInTaskbar = false, MinimizeBox = false
+            })
+            {
+                var body = Table();
+                body.AutoSize = false;
+                body.Dock = DockStyle.Fill;
+                body.Padding = new Padding(16);
+                dialog.Controls.Add(body);
+                AddRow(body, new Label { Text = summary, AutoSize = true, MaximumSize = new Size(390, 0) });
+                AddRow(body, new TextBox
+                {
+                    Text = string.Join(Environment.NewLine, paths), Multiline = true, ReadOnly = true,
+                    Dock = DockStyle.Fill, ScrollBars = ScrollBars.Vertical, AccessibleName = "Files to delete"
+                }, SizeType.Percent, 100);
+                var cancel = Button("Cancel");
+                cancel.DialogResult = DialogResult.Cancel;
+                var delete = Button("&Delete files");
+                delete.DialogResult = DialogResult.Yes;
+                AddRow(body, Flow(cancel, delete));
+                dialog.AcceptButton = dialog.CancelButton = cancel;
+                dialog.ActiveControl = cancel;
+                return Show(dialog, owner) == DialogResult.Yes;
+            }
+        }
+
         internal static void Message(Form owner, string message, string title) =>
             ShowMessage(owner, message, title);
 

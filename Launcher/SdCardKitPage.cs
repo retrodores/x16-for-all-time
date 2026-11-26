@@ -181,6 +181,13 @@ namespace CommanderX16
 
                     entry.Path = path;
                     entry.SdKitRoot = root;
+                    entry.Source = new ProgramSource
+                    {
+                        Title = item.Path.Substring(KitRoot.Length + 1),
+                        Version = kitRevision,
+                        Url = KitRepository + "/blob/" + kitRevision + "/" +
+                            string.Join("/", item.Path.Split('/').Select(Uri.EscapeDataString))
+                    };
                     id = entry.Id;
                 });
                 extracted = null;

@@ -275,7 +275,32 @@ namespace CommanderX16
         [DataMember(EmitDefaultValue = false)] public string SdKitRoot;
         [DataMember(EmitDefaultValue = false)] public string StartGifPath;
         [DataMember] public Profile Options;
+        [DataMember(EmitDefaultValue = false)] public ProgramSource Source;
+        [DataMember(EmitDefaultValue = false)] public ProgramInstallation PreviousInstall;
+
+        public void RememberInstallation(string replacementPath)
+        {
+            if (!string.IsNullOrEmpty(Path) && !string.Equals(Path, replacementPath, StringComparison.OrdinalIgnoreCase))
+                PreviousInstall = new ProgramInstallation { Path = Path, Source = Source };
+        }
+
         public override string ToString() => Name;
+    }
+
+    [DataContract]
+    internal sealed class ProgramSource
+    {
+        [DataMember] public string Title;
+        [DataMember] public string Author;
+        [DataMember] public string Version;
+        [DataMember] public string Url;
+    }
+
+    [DataContract]
+    internal sealed class ProgramInstallation
+    {
+        [DataMember] public string Path;
+        [DataMember] public ProgramSource Source;
     }
 
     [DataContract]

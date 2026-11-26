@@ -47,7 +47,10 @@ namespace CommanderX16
             search.Clear();
             RefreshPrograms(id);
             tabs.SelectedTab = start;
-            launchStatus.Text = "Added to Start from " + source;
+            var added = store.Data.Programs.FirstOrDefault(entry => entry.Id == id);
+            launchStatus.Text = added?.PreviousInstall != null && source == "X16 Files"
+                ? "Reinstalled. See the program menu for the previous copy."
+                : "Added to Start from " + source;
         }
 
         private void BuildCatalogPage(TabPage page, TabControl tabs, TabPage start)
@@ -59,7 +62,14 @@ namespace CommanderX16
             AddRow(body, Flow(downloadableOnly, catalogCount));
             AddRow(body, catalogTree, SizeType.Percent, 100);
             AddRow(body, catalogDetails, SizeType.Absolute, 112);
-            AddRow(body, Flow(openProject, installProgram, downloadProgram, catalogActivity));
+            var correction = Button("Report listing correction…", () => Attempt(() =>
+            {
+                var program = (CatalogProgram)catalogTree.SelectedNode?.Tag;
+                if (program != null) OpenReport("https://github.com/retrodores/x16files.com", "Listing correction", program.Id);
+            }));
+            correction.Enabled = false;
+            catalogTree.AfterSelect += (sender, args) => correction.Enabled = catalogTree.SelectedNode?.Tag is CatalogProgram;
+            AddRow(body, Flow(openProject, installProgram, downloadProgram, correction, catalogActivity));
             AddRow(body, catalogStatus);
             UpdateCatalogSelection();
 
@@ -234,7 +244,13 @@ namespace CommanderX16
                         }
                         data.Programs.Add(entry);
                     }
+                    entry.RememberInstallation(path);
                     entry.Path = path;
+                    entry.Source = new ProgramSource
+                    {
+                        Title = program.ToString(), Author = program.Author?.Name,
+                        Version = program.Version, Url = program.PageUrl
+                    };
                     id = entry.Id;
                 });
                 catalogStatus.Text = "Installed " + program + " and added it to Start.";
