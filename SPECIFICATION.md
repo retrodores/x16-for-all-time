@@ -10,7 +10,7 @@ This document describes the launcher behavior and X16 Files interface implemente
 | Add PRG | Accept local `.prg` and `.zip` files. Reference a loose PRG in place. Import a ZIP using the archive rules below, and keep the imported files when the entry is saved. Canceling the add operation discards the import. |
 | X16 Files | Browse and search the catalog, open project pages, filter to entries with downloadable packages, and show a count that follows the search and filter. Offer explicit refresh, install or reinstall to Start, and download and launch. |
 | Emulators | Register an existing emulator executable or install platform-appropriate builds side by side. Allow multiple builds, including forks. Each build can have named profiles and a default profile. |
-| Profiles | Use a profile to prefill settings for a Start entry or Start defaults. Saved settings are a copy. Entries set to use Start defaults follow that configuration. Explicitly assigned entries keep their settings if the emulator is removed and need reassignment before launch. |
+| Profiles | Use a profile to prefill settings for a Start entry or Start defaults. Saved settings are a copy. Entries set to use Start defaults follow that configuration. Explicitly assigned entries keep their saved settings if the emulator is removed. Use a working Start default or the sole available emulator as a fallback, without overwriting those settings. |
 
 A Start entry needs a usable emulator and a PRG to launch. Entries can be added or configured before an emulator is installed. The Windows client keeps settings and managed programs in per-user storage. A port can use XDG directories on Linux and Application Support on macOS. Give each imported or downloaded package its own directory to avoid overwriting files shared by existing entries.
 
@@ -68,7 +68,7 @@ The declared format determines whether the launcher offers a download. The serve
 
 - **Install to Start** downloads the selected package and records its PRG path with the catalog ID. Installation can succeed before the user has registered an emulator.
 - **Reinstall to Start** updates the PRG path for the matching catalog ID and keeps the entry's name and launch settings. A failed download, invalid archive, or canceled picker leaves the existing entry intact.
-- **Download and launch** fetches the package and launches its PRG with run-after-load enabled. Use Start defaults when configured. If exactly one emulator is registered, the reference client uses that build's default profile as a fallback. Otherwise prompt for emulator setup.
+- **Download and launch** fetches the package and launches its PRG with run-after-load enabled. Use Start defaults when configured. If only one registered emulator executable is available, the reference client uses that build's default profile as a fallback. Otherwise prompt for emulator setup.
 - When several supported packages are offered, let the user select one before downloading. A double-click on a downloadable catalog row is a shortcut for install or reinstall.
 
 ## PRG and ZIP handling

@@ -298,16 +298,10 @@ namespace CommanderX16
             Func<IProgress<string>, Task<(string Path, string Root)>> getProgram,
             Action<bool, string> setBusy, Label status, string installedId)
         {
-            var emulator = store.Data.FindEmulator(store.Data.StartEmulatorId);
-            var source = emulator == null ? null : store.Data.StartOptions;
-            if (emulator == null && store.Data.Emulators.Count == 1)
-            {
-                emulator = store.Data.Emulators[0];
-                source = store.Data.DefaultProfile(emulator);
-            }
+            var emulator = store.Data.ResolveLaunch(null, out var source);
             if (emulator == null)
             {
-                LauncherDialogs.Message(this, MissingLaunchSetup(new ProgramEntry()), "Download and launch");
+                LauncherDialogs.Message(this, MissingLaunchSetup(), "Download and launch");
                 return;
             }
 
@@ -363,7 +357,7 @@ namespace CommanderX16
         {
             if (installedId == null) return false;
             var installed = store.Data.Programs.FirstOrDefault(entry => entry.Id == installedId);
-            if (installed == null || store.Data.LaunchEmulator(installed) != null ||
+            if (installed == null || store.Data.ConfiguredLaunchEmulator(installed) != null ||
                 store.Data.FindEmulator(emulator.Id) == null) return false;
 
             store.Save(data =>

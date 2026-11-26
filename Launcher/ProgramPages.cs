@@ -439,10 +439,10 @@ namespace CommanderX16
         private void EditLaunchSettings(ProgramEntry program, string title = "Launch settings", bool create = false)
         {
             if (program == null) return;
-            var emulator = store.Data.LaunchEmulator(program);
-            var initial = store.Data.UsesStartDefaults(program) ? store.Data.StartOptions : program.Options;
-            if (emulator == null && store.Data.UsesStartDefaults(program) && store.Data.Emulators.Count == 1)
-                emulator = store.Data.Emulators[0];
+            Profile initial = program.Options;
+            var emulator = store.Data.UsesStartDefaults(program)
+                ? store.Data.ResolveLaunch(null, out initial)
+                : store.Data.FindEmulator(program.EmulatorId);
             using (var dialog = new LaunchSettingsForm(store.Data, title, emulator, initial, program))
             {
                 if (LauncherDialogs.Show(dialog, this) != DialogResult.OK) return;
@@ -473,11 +473,11 @@ namespace CommanderX16
 
         private void EditStartDefaults()
         {
-            var current = store.Data.FindEmulator(store.Data.StartEmulatorId);
-            var selected = current ?? (store.Data.Emulators.Count == 1 ? store.Data.Emulators[0] : null);
+            var selected = store.Data.ResolveLaunch(null, out _);
+            var configured = store.Data.ConfiguredLaunchEmulator();
             using (var dialog = new LaunchSettingsForm(store.Data, "Start defaults", selected,
-                current == null ? null : store.Data.StartOptions,
-                clearAction: current == null ? null : "Clear Start defaults"))
+                configured == null ? null : store.Data.StartOptions,
+                clearAction: store.Data.StartEmulatorId == null ? null : "Clear Start defaults"))
             {
                 var result = LauncherDialogs.Show(dialog, this);
                 if (result != DialogResult.OK && result != DialogResult.Abort) return;
@@ -549,9 +549,8 @@ namespace CommanderX16
             }
         }
 
-        private Request Prepare(ProgramEntry program, Emulator emulator, bool validate)
+        private Request Prepare(ProgramEntry program, Emulator emulator, Profile options, bool validate)
         {
-            var options = store.Data.LaunchOptions(program);
             if (saveGif.Checked)
             {
                 var output = program.Id == gifEntryId ? gifFile.Text : program.StartGifPath;
@@ -568,7 +567,8 @@ namespace CommanderX16
         private void RefreshPreview()
         {
             var program = SelectedProgram;
-            var emulator = program == null ? null : store.Data.LaunchEmulator(program);
+            Profile options = null;
+            var emulator = program == null ? null : store.Data.ResolveLaunch(program, out options);
             UpdateCatalogSelection();
             UpdateKitSelection();
             run.Enabled = false;
@@ -582,24 +582,24 @@ namespace CommanderX16
                 selectionStatus.AccessibilityObject.RaiseLiveRegionChanged();
             }
             var programType = Launch.IsBasicProgram(program?.Path) ? "BAS" : "PRG";
-            run.Text = (program != null && store.Data.LaunchOptions(program).AutoRun ? "Run " : "Load ") + programType;
+            run.Text = (options?.AutoRun == true ? "Run " : "Load ") + programType;
             saveGif.Enabled = !launching && program != null;
             gifFile.Enabled = browseGif.Enabled = saveGif.Enabled && saveGif.Checked;
             startDefaults.Enabled = !launching && store.Data.Emulators.Count != 0;
             launchConfiguration.Text = emulator == null ? "Command preview" :
-                (store.Data.UsesStartDefaults(program) ? "Start defaults" : "PRG settings") + " · " + emulator.Name;
+                (program.EmulatorId == emulator.Id ? "PRG settings" : "Start defaults") + " · " + emulator.Name;
             startSettings.Enabled = duplicate.Enabled = !launching && program != null;
             removeProgram.Enabled = !launching && startMenu.SelectedItems.Count > 0;
             copy.Enabled = false;
             if (startMenu.SelectedItems.Count > 1) preview.Text = startMenu.SelectedItems.Count + " programs selected.";
             else if (program == null) preview.Text = store.Data.Programs.Count == 0 ? "Browse X16 Files or add a local program to get started." : "No matching programs.";
             else if (store.Data.Emulators.Count == 0) preview.Text = "Choose an emulator to run " + program.Name + ".";
-            else if (emulator == null) preview.Text = MissingLaunchSetup(program);
+            else if (emulator == null) preview.Text = MissingLaunchSetup();
             else
             {
                 try
                 {
-                    var command = Prepare(program, emulator, true);
+                    var command = Prepare(program, emulator, options, true);
                     run.Text = (Launch.HasExtraOption(command.Arguments, "-run") ? "Run " : "Load ") + programType;
                     run.Enabled = copy.Enabled = !launching;
                     preview.Text = CommandPreview(command);
@@ -611,20 +611,22 @@ namespace CommanderX16
         private void CopyPreview()
         {
             var program = SelectedProgram;
-            Request request = Prepare(program, store.Data.LaunchEmulator(program), false);
+            var emulator = store.Data.ResolveLaunch(program, out var options);
+            if (emulator == null) throw new InvalidOperationException(MissingLaunchSetup());
+            Request request = Prepare(program, emulator, options, false);
             Clipboard.SetText("Start-Process -FilePath " + Launch.PowerShellLiteral(request.Exe) +
                 " -WorkingDirectory " + Launch.PowerShellLiteral(request.WorkingDirectory) +
                 " -ArgumentList " + Launch.PowerShellLiteral(request.Arguments));
             launchStatus.Text = "Copied";
         }
 
-        private string MissingLaunchSetup(ProgramEntry program)
+        private string MissingLaunchSetup()
         {
             if (store.Data.Emulators.Count == 0)
                 return "Register or install an X16Emu build on the Emulators tab.";
-            return store.Data.UsesStartDefaults(program)
-                ? "Set Start defaults or choose an emulator in Launch settings."
-                : "Choose a replacement emulator in Launch settings.";
+            if (!store.Data.Emulators.Any(build => File.Exists(build.Exe)))
+                return "No registered emulator executable was found. Check the executable paths on the Emulators tab.";
+            return "Choose an emulator in Start defaults, or set one for this program in Launch settings.";
         }
 
         private async Task RunSelected(ProgramEntry program)
@@ -633,10 +635,10 @@ namespace CommanderX16
             Request request = null;
             try
             {
-                var emulator = store.Data.LaunchEmulator(program);
-                if (emulator == null) throw new InvalidOperationException(MissingLaunchSetup(program));
-                request = Prepare(program, emulator, false);
-                Prepare(program, emulator, true);
+                var emulator = store.Data.ResolveLaunch(program, out var options);
+                if (emulator == null) throw new InvalidOperationException(MissingLaunchSetup());
+                request = Prepare(program, emulator, options, false);
+                Prepare(program, emulator, options, true);
                 launching = true;
                 RefreshPreview();
                 preview.Text = CommandPreview(request);

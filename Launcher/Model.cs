@@ -41,11 +41,33 @@ namespace CommanderX16
 
         public bool UsesStartDefaults(ProgramEntry entry) => entry.EmulatorId == null && !entry.RequiresEmulatorSelection;
 
-        public Emulator LaunchEmulator(ProgramEntry entry) =>
-            FindEmulator(UsesStartDefaults(entry) ? StartEmulatorId : entry.EmulatorId);
+        public Emulator ConfiguredLaunchEmulator(ProgramEntry entry = null)
+        {
+            var emulator = FindEmulator(entry == null || UsesStartDefaults(entry) ? StartEmulatorId : entry.EmulatorId);
+            return File.Exists(emulator?.Exe) ? emulator : null;
+        }
 
-        public Profile LaunchOptions(ProgramEntry entry) =>
-            (UsesStartDefaults(entry) ? StartOptions : entry.Options) ?? Profile.CopyOptions(null, LaunchEmulator(entry));
+        public Emulator ResolveLaunch(ProgramEntry entry, out Profile options)
+        {
+            var emulator = entry != null && !UsesStartDefaults(entry) ? ConfiguredLaunchEmulator(entry) : null;
+            if (emulator != null)
+            {
+                options = entry.Options ?? Profile.CopyOptions(null, emulator);
+                return emulator;
+            }
+
+            emulator = ConfiguredLaunchEmulator();
+            if (emulator != null)
+            {
+                options = StartOptions ?? Profile.CopyOptions(null, emulator);
+                return emulator;
+            }
+
+            var available = Emulators.Where(build => File.Exists(build.Exe)).Take(2).ToArray();
+            emulator = available.Length == 1 ? available[0] : null;
+            options = DefaultProfile(emulator) ?? Profile.CopyOptions(null, emulator);
+            return emulator;
+        }
 
         public bool HasProgramName(string name, string exceptId = null) =>
             Programs.Any(entry => entry.Id != exceptId && MainForm.Same(entry.Name?.Trim(), name.Trim()));
