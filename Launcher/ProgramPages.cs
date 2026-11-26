@@ -19,6 +19,11 @@ namespace CommanderX16
             AccessibleName = "Start programs"
         };
         private bool updatingStartSelection;
+        private Rectangle startDragArea;
+        private string startDragCandidate;
+        private string startDragId;
+        private int lastStartDragScroll;
+        private const string StartDragFormat = "X16ForAllTime.StartProgram";
         private ProgramEntry SelectedProgram => startMenu.SelectedItems.Count == 1
             ? (ProgramEntry)startMenu.SelectedItem : null;
         private readonly Button startSettings = Button("Launch settings…");
@@ -86,6 +91,7 @@ namespace CommanderX16
                 RefreshPreview();
             };
             BuildStartContextMenu();
+            EnableStartDragging();
             startMenu.MouseDoubleClick += async (sender, args) =>
             {
                 if (args.Button != MouseButtons.Left || (ModifierKeys & (Keys.Control | Keys.Shift)) != Keys.None) return;
@@ -114,17 +120,24 @@ namespace CommanderX16
             var revert = new ToolStripMenuItem("Revert to previous install…", null, (sender, args) => Attempt(RevertInstall));
             var moveUp = new ToolStripMenuItem("Move up", null, (sender, args) => Attempt(() => MoveStartProgram(-1)));
             var moveDown = new ToolStripMenuItem("Move down", null, (sender, args) => Attempt(() => MoveStartProgram(1)));
+            var moveTop = new ToolStripMenuItem("Send to top", null, (sender, args) =>
+                Attempt(() => MoveStartProgramToEdge(true)));
+            var moveBottom = new ToolStripMenuItem("Send to bottom", null, (sender, args) =>
+                Attempt(() => MoveStartProgramToEdge(false)));
             var unlink = new ToolStripMenuItem("Remove from Start", null, (sender, args) => Attempt(RemoveStartEntries));
             var delete = new ToolStripMenuItem("Delete programs from disk…", null, (sender, args) => removeProgram.PerformClick());
             var items = actions.Select(button =>
                 new ToolStripMenuItem(button.Text, null, (sender, args) => button.PerformClick())).ToArray();
             contextMenu.Items.AddRange(items);
-            contextMenu.Items.AddRange(new ToolStripItem[] { new ToolStripSeparator(), moveUp, moveDown, info, openPrevious, revert, unlink, delete });
+            contextMenu.Items.AddRange(new ToolStripItem[] { new ToolStripSeparator(), moveUp, moveDown, moveTop, moveBottom, new ToolStripSeparator(), info, openPrevious, revert, unlink, delete });
             contextMenu.Opening += (sender, args) =>
             {
                 args.Cancel = startMenu.SelectedItem == null;
                 moveUp.Enabled = !launching && SelectedProgram != null && startMenu.SelectedIndex > 0;
                 moveDown.Enabled = !launching && SelectedProgram != null && startMenu.SelectedIndex < startMenu.Items.Count - 1;
+                moveTop.Enabled = !launching && SelectedProgram != null && store.Data.Programs[0].Id != SelectedProgram.Id;
+                moveBottom.Enabled = !launching && SelectedProgram != null &&
+                    store.Data.Programs[store.Data.Programs.Count - 1].Id != SelectedProgram.Id;
                 info.Enabled = SelectedProgram != null;
                 string previousPath = SelectedProgram?.PreviousInstall?.Path;
                 openPrevious.Enabled = previousPath != null && Directory.Exists(Path.GetDirectoryName(previousPath));
@@ -146,6 +159,93 @@ namespace CommanderX16
                 if (index >= 0) startMenu.SetSelected(index, true);
             };
             startMenu.Disposed += (sender, args) => contextMenu.Dispose();
+        }
+
+        private void EnableStartDragging()
+        {
+            startMenu.AllowDrop = true;
+            startMenu.MouseDown += (sender, args) =>
+            {
+                startDragArea = Rectangle.Empty;
+                if (args.Button != MouseButtons.Left || ModifierKeys != Keys.None || launching) return;
+                int index = startMenu.IndexFromPoint(args.Location);
+                if (index < 0 || startMenu.SelectedItems.Count > 1) return;
+                startDragCandidate = ((ProgramEntry)startMenu.Items[index]).Id;
+                var size = SystemInformation.DragSize;
+                startDragArea = new Rectangle(args.X - size.Width / 2, args.Y - size.Height / 2, size.Width, size.Height);
+            };
+            startMenu.MouseUp += (sender, args) => startDragArea = Rectangle.Empty;
+            startMenu.MouseMove += (sender, args) =>
+            {
+                if (args.Button != MouseButtons.Left || startDragArea.IsEmpty || startDragArea.Contains(args.Location) ||
+                    launching) return;
+                startDragArea = Rectangle.Empty;
+                startDragId = startDragCandidate;
+                lastStartDragScroll = Environment.TickCount;
+                try { startMenu.DoDragDrop(new DataObject(StartDragFormat, startDragId), DragDropEffects.Move); }
+                finally { startDragId = null; }
+            };
+            startMenu.DragEnter += ShowStartDropTarget;
+            startMenu.DragOver += ShowStartDropTarget;
+            startMenu.DragDrop += (sender, args) =>
+            {
+                if (!IsStartDrag(args)) return;
+                var point = startMenu.PointToClient(new Point(args.X, args.Y));
+                if (!startMenu.ClientRectangle.Contains(point)) return;
+                int row = startMenu.IndexFromPoint(point);
+                bool after = row < 0;
+                if (row < 0) row = startMenu.Items.Count - 1;
+                else
+                {
+                    var bounds = startMenu.GetItemRectangle(row);
+                    after = point.Y >= bounds.Top + bounds.Height / 2;
+                }
+                string anchor = ((ProgramEntry)startMenu.Items[row]).Id;
+                Attempt(() => InsertStartProgram(startDragId, anchor, after));
+            };
+        }
+
+        private bool IsStartDrag(DragEventArgs args) =>
+            !launching && startDragId != null && Equals(startDragId, args.Data?.GetData(StartDragFormat));
+
+        private void ShowStartDropTarget(object sender, DragEventArgs args)
+        {
+            args.Effect = IsStartDrag(args) ? DragDropEffects.Move : DragDropEffects.None;
+            if (args.Effect == DragDropEffects.None || unchecked(Environment.TickCount - lastStartDragScroll) < 115) return;
+            int y = startMenu.PointToClient(new Point(args.X, args.Y)).Y;
+            int first = startMenu.TopIndex;
+            int rows = Math.Max(1, startMenu.ClientSize.Height / startMenu.ItemHeight);
+            if (y < startMenu.ItemHeight && first > 0)
+                startMenu.TopIndex = first - 1;
+            else if (y >= startMenu.ClientSize.Height - startMenu.ItemHeight && first + rows < startMenu.Items.Count)
+                startMenu.TopIndex = first + 1;
+            lastStartDragScroll = Environment.TickCount;
+        }
+
+        private void MoveStartProgramToEdge(bool top)
+        {
+            var selected = SelectedProgram;
+            if (selected == null) return;
+            var programs = store.Data.Programs;
+            InsertStartProgram(selected.Id, programs[top ? 0 : programs.Count - 1].Id, !top);
+        }
+
+        private void InsertStartProgram(string id, string anchorId, bool after)
+        {
+            if (id == anchorId) return;
+            var programs = store.Data.Programs;
+            int from = programs.FindIndex(entry => entry.Id == id);
+            int anchor = programs.FindIndex(entry => entry.Id == anchorId);
+            if (from < 0 || anchor < 0) return;
+            int to = anchor + (after ? 1 : 0) - (from < anchor ? 1 : 0);
+            if (from == to) return;
+            store.Save(data =>
+            {
+                var entry = data.Programs[from];
+                data.Programs.RemoveAt(from);
+                data.Programs.Insert(to, entry);
+            });
+            RefreshPrograms(id);
         }
 
         private void MoveStartProgram(int direction)
