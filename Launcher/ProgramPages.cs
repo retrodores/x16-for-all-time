@@ -42,8 +42,6 @@ namespace CommanderX16
         private readonly Button duplicate = Button("Duplicate entry…"),
             removeProgram = Button("Delete files…");
         private readonly Button browsePrograms = Button("Browse X16 Files");
-        private readonly Button installStartEmulator = Button("Install emulator…");
-        private readonly Button registerStartEmulator = Button("Register existing…");
         private readonly Label selectionStatus = new Label { AutoSize = true, LiveSetting = AutomationLiveSetting.Polite };
 
         private void BuildStartPage(TabPage start, TabControl tabs, TabPage catalogPage)
@@ -60,10 +58,7 @@ namespace CommanderX16
             preview.AccessibleName = "Emulator command preview";
             AddRow(startBody, Flow(Button("Add a local program…", () =>
                 EditLaunchSettings(new ProgramEntry(), "Add a local program", create: true)), browsePrograms, startDefaults));
-            AddRow(startBody, Flow(installStartEmulator, registerStartEmulator));
             browsePrograms.Click += (sender, args) => tabs.SelectedTab = catalogPage;
-            installStartEmulator.Click += (sender, args) => SetupFirstEmulator(ShowInstall);
-            registerStartEmulator.Click += (sender, args) => SetupFirstEmulator(() => EditEmulator(null));
             startMenu.BackColor = SystemColors.Window;
             startMenu.ForeColor = SystemColors.WindowText;
             startMenu.Font = new Font("Segoe UI", 13);
@@ -314,33 +309,6 @@ namespace CommanderX16
                 startMenu.TopIndex = index;
             else if (index - first >= visibleRows)
                 startMenu.TopIndex = index - visibleRows + 1;
-        }
-
-        private void SetupFirstEmulator(Action setup)
-        {
-            Attempt(() =>
-            {
-                var id = SelectedProgram?.Id;
-                setup();
-                var emulator = store.Data.Emulators.Count == 1 ? store.Data.Emulators[0] : null;
-                if (id == null || emulator == null) return;
-                store.Save(data =>
-                {
-                    var entry = data.Programs.Single(item => item.Id == id);
-                    if (data.UsesStartDefaults(entry))
-                    {
-                        data.StartEmulatorId = emulator.Id;
-                        data.StartOptions = Profile.Snapshot(data.DefaultProfile(emulator), emulator);
-                    }
-                    else
-                    {
-                        entry.EmulatorId = emulator.Id;
-                        entry.RequiresEmulatorSelection = false;
-                    }
-                });
-                RefreshPrograms(id);
-                run.Focus();
-            });
         }
 
         private void RemoveStartEntries()
@@ -605,7 +573,6 @@ namespace CommanderX16
             UpdateKitSelection();
             run.Enabled = false;
             browsePrograms.Visible = store.Data.Programs.Count == 0;
-            installStartEmulator.Visible = registerStartEmulator.Visible = program != null && store.Data.Emulators.Count == 0;
             int count = startMenu.SelectedItems.Count;
             var selection = count == 1 ? "1 program selected" : count + " programs selected";
             selectionStatus.Visible = count > 0;

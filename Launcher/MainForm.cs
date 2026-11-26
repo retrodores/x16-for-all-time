@@ -12,6 +12,13 @@ namespace CommanderX16
         private static Color Navy => SystemInformation.HighContrast ? SystemColors.WindowText : Color.FromArgb(20, 36, 57);
         private static readonly Color Teal = Color.FromArgb(24, 113, 110);
         private readonly SettingsStore store;
+        private readonly TabControl pages = new TabControl { Dock = DockStyle.Fill };
+        private readonly TabPage emulatorPage = new TabPage("Emulators") { Padding = new Padding(12) };
+        private readonly Label emulatorRequired = new Label
+        {
+            Text = "First, install or register an emulator to unlock Start, X16 Files, and SD Card Kit.",
+            AutoSize = true, ForeColor = Navy, Margin = new Padding(0, 0, 0, 12)
+        };
         private readonly ComboBox emulators = Combo(), profiles = Combo();
         private readonly TextBox preview = new TextBox { Multiline = true, ReadOnly = true, Dock = DockStyle.Fill, ScrollBars = ScrollBars.Vertical };
         private readonly Button run = Button("Run"), copy = Button("Copy PowerShell");
@@ -60,12 +67,20 @@ namespace CommanderX16
             about.Anchor = AnchorStyles.Right;
             header.Controls.Add(about, 1, 0);
             AddRow(layout, header);
-            var pages = new TabControl { Dock = DockStyle.Fill };
             var start = new TabPage("Start") { Padding = new Padding(12) };
-            var emulatorPage = new TabPage("Emulators") { Padding = new Padding(12) };
             var catalogPage = new TabPage("X16 Files") { Padding = new Padding(12) };
             var kitPage = new TabPage("SD Card Kit") { Padding = new Padding(12) };
             pages.TabPages.AddRange(new[] { start, catalogPage, kitPage, emulatorPage });
+            pages.Selecting += (sender, args) => args.Cancel = args.TabPage?.Enabled == false;
+            pages.DrawItem += (sender, args) =>
+            {
+                var page = pages.TabPages[args.Index];
+                args.DrawBackground();
+                TextRenderer.DrawText(args.Graphics, page.Text, pages.Font, args.Bounds,
+                    page.Enabled ? SystemColors.ControlText : SystemColors.GrayText,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+                args.DrawFocusRectangle();
+            };
             AddRow(layout, pages, SizeType.Percent, 100);
             BuildStartPage(start, pages, catalogPage);
             BuildCatalogPage(catalogPage, pages, start);
@@ -75,6 +90,7 @@ namespace CommanderX16
             emulatorBody.AutoSize = false;
             emulatorBody.Dock = DockStyle.Fill;
             emulatorPage.Controls.Add(emulatorBody);
+            AddRow(emulatorBody, emulatorRequired);
             var selections = Table();
             var buildActions = Flow(Button("Install or update…", ShowInstall), Button("Register existing…", () => EditEmulator(null)));
             buildActions.Dock = DockStyle.None;
@@ -117,7 +133,19 @@ namespace CommanderX16
             emulators.Items.AddRange(store.Data.Emulators.Cast<object>().ToArray());
             SelectById(emulators, store.Data.Emulators.FindIndex(e => e.Id == emulatorId));
             binding = false;
+            UpdateEmulatorRequirement();
             BindProfiles(profileId);
+        }
+
+        private void UpdateEmulatorRequirement()
+        {
+            bool hasEmulator = store.Data.Emulators.Count != 0;
+            emulatorRequired.Visible = !hasEmulator;
+            if (!hasEmulator) pages.SelectedTab = emulatorPage;
+            foreach (TabPage page in pages.TabPages)
+                page.Enabled = hasEmulator || page == emulatorPage;
+            pages.DrawMode = hasEmulator ? TabDrawMode.Normal : TabDrawMode.OwnerDrawFixed;
+            pages.Invalidate();
         }
 
         private void BindProfiles(string profileId)
