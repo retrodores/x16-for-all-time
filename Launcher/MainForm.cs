@@ -19,7 +19,7 @@ namespace CommanderX16
             Text = "First, install or register an emulator to unlock Start, X16 Files, and SD Card Kit.",
             AutoSize = true, ForeColor = Navy, Margin = new Padding(0, 0, 0, 12)
         };
-        private readonly ComboBox emulators = Combo(), profiles = Combo();
+        private readonly ComboBox emulators = Combo(), profiles = ProfileCombo();
         private readonly TextBox preview = new TextBox { Multiline = true, ReadOnly = true, Dock = DockStyle.Fill, ScrollBars = ScrollBars.Vertical };
         private readonly Button run = Button("Run"), copy = Button("Copy PowerShell");
         private readonly Label launchStatus = new Label { AutoSize = true, ForeColor = Navy };
@@ -476,6 +476,17 @@ namespace CommanderX16
         {
             var box = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, MinimumSize = new Size(135, 0), Dock = DockStyle.Fill };
             box.Items.AddRange(items);
+            return box;
+        }
+
+        internal static ComboBox ProfileCombo()
+        {
+            const int visibleRows = 8;
+            var box = Combo();
+            box.MaxDropDownItems = visibleRows;
+            box.IntegralHeight = false;
+            box.DropDown += (sender, args) =>
+                box.DropDownHeight = Math.Max(1, Math.Min(visibleRows, box.Items.Count)) * box.ItemHeight + 2;
             return box;
         }
 

@@ -32,7 +32,7 @@ Use **Register existing** for an unpacked folder or executable, including rename
 
 Each build starts with a **Default** profile and can have additional named profiles with **New profile**, **Edit**, **Duplicate**, **Delete**, and **Set as default**. Profiles prefill PRG settings and Start defaults. Saving either makes an independent copy, including the effective ROM and extra arguments. Each X16Emu install creates 24 presets that cover 65C02 and 65C816, 2, 4, and 8 MHz, and 512, 1024, 1536, and 2048 KiB of banked RAM. Every new preset and the new **Default** profile use 2× display scale. Reinstalling preserves edits to those profiles. Use **Advanced hardware** to enter custom clock and RAM values.
 
-**Open folder** opens the selected emulator’s directory in File Explorer. **Remove emulator** offers **Remove from list** to keep the folder on disk or **Delete emulator files** to permanently delete the folder after confirmation. PRGs referring to the build keep their saved options and use the Start fallback when available. Profiles from removed builds remain available to copy.
+**Open folder** opens the selected emulator’s directory in File Explorer. **Remove emulator** offers **Remove from list** to keep the folder on disk or **Delete emulator files** to permanently delete the folder after confirmation. PRGs referring to the build keep their saved options and use the Start fallback when available. The launch settings picker shows each distinct settings combination once, with profiles from removed builds listed after the current emulator’s profiles.
 
 ## Linux and macOS ports
 
