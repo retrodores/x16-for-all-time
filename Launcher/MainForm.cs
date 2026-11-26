@@ -218,6 +218,7 @@ namespace CommanderX16
                     }
                     string id = existing?.Id ?? Guid.NewGuid().ToString("N");
                     string profileId = SelectedProfile?.Id;
+                    string overlay = SerialNetworkOverlay.Detect(dialog.Executable);
                     store.Save(data =>
                     {
                         var emulator = data.Emulators.FirstOrDefault(e => e.Id == id);
@@ -231,6 +232,7 @@ namespace CommanderX16
                             emulator.InstallRoot = null;
                         emulator.Exe = dialog.Executable;
                         emulator.UpstreamOptions = dialog.StandardOptions;
+                        emulator.SerialOverlayVersion = overlay;
                     });
                     BindEmulators(id, profileId);
                     RefreshPrograms();

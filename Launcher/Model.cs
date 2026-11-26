@@ -195,6 +195,8 @@ namespace CommanderX16
         [DataMember] public string Release;
         [DataMember] public string Asset;
         [DataMember] public string InstallRoot;
+        [DataMember(EmitDefaultValue = false)] public string SerialOverlayVersion;
+        public bool SupportsSerialCard => SerialOverlayVersion == SerialNetworkOverlay.Version;
         [DataMember] public bool UpstreamOptions;
         [DataMember] public string Extra;
         [DataMember] public string DefaultRom;
@@ -222,6 +224,8 @@ namespace CommanderX16
         [DataMember] public string Extra;
         [DataMember] public string Gif;
         [DataMember(Name = "SerialCard", EmitDefaultValue = false)] private bool legacySerialCard;
+        [DataMember(EmitDefaultValue = false)] public bool? EnableSerialCard;
+        [DataMember(EmitDefaultValue = false)] public string SerialCardAddress;
         [DataMember] public string DetachedFrom;
         public override string ToString() => string.IsNullOrEmpty(DetachedFrom) ? Name : Name + " (from " + DetachedFrom + ")";
 
@@ -324,6 +328,7 @@ namespace CommanderX16
         [DataMember] public string Destination;
         [DataMember(EmitDefaultValue = false)] public string Url;
         [DataMember] public bool Overwrite;
+        [DataMember(EmitDefaultValue = false)] public bool SerialOverlay;
     }
 
     [DataContract]
@@ -356,6 +361,8 @@ namespace CommanderX16
                     throw new InvalidDataException("Unsupported settings file. Your settings were left on disk.");
                 if (!Data.BuildDefaultsMigrated || !Data.RomCopiesMigrated || !Data.ProfileCopiesMigrated || !Data.GenericExtrasMigrated || !Data.EntryOptionsMigrated || Data.Programs == null)
                     Save(settings => settings.Upgrade());
+                foreach (var emulator in Data.Emulators)
+                    emulator.SerialOverlayVersion = SerialNetworkOverlay.Detect(emulator.Exe);
             }
             catch
             {
@@ -478,9 +485,19 @@ namespace CommanderX16
             Add(args, "-scale", profile.Scale);
             if (profile.Fullscreen) args.Add("-fullscreen");
             string extra = (profile.Extra ?? emulator.Extra)?.Trim();
+            extra = RemoveSerialCardOption(extra, out var suppliedAddress);
+            if (emulator.SupportsSerialCard && profile.EnableSerialCard != false)
+            {
+                args.Add("-serialcard");
+                Add(args, suppliedAddress ?? profile.SerialCardAddress);
+            }
             string rom = profile.Rom;
-            if (rom == null && !HasExtraOption(extra, "-rom"))
-                rom = emulator.DefaultRom;
+            if (!HasExtraOption(extra, "-rom"))
+            {
+                if (rom == null) rom = emulator.DefaultRom;
+                if (string.IsNullOrWhiteSpace(rom) && emulator.SupportsSerialCard)
+                    rom = Path.Combine(Path.GetDirectoryName(emulator.Exe), "rom.bin");
+            }
             AddPath(args, "-rom", rom, "ROM", validate);
             AddPath(args, "-sdcard", profile.SdCard, "SD card image", validate);
             AddPath(args, "-fsroot", profile.FsRoot, "Host filesystem root", validate, true);
@@ -531,6 +548,23 @@ namespace CommanderX16
             }
             copy.Extra = extra.Trim();
             return copy;
+        }
+
+        internal static string RemoveSerialCardOption(string extra, out string address)
+        {
+            address = null;
+            extra = extra ?? "";
+            var tokens = ArgumentTokens.Matches(extra).Cast<Match>().ToArray();
+            for (int i = tokens.Length - 1; i >= 0; i--)
+            {
+                var flag = tokens[i];
+                if (!IsOption(flag, "-serialcard")) continue;
+                var operand = i + 1 < tokens.Length && !tokens[i + 1].Value.Trim('"').StartsWith("-", StringComparison.Ordinal)
+                    ? tokens[i + 1] : flag;
+                if (operand != flag) address = address ?? operand.Value.Trim('"');
+                extra = extra.Remove(flag.Index, operand.Index + operand.Length - flag.Index);
+            }
+            return extra.Trim();
         }
 
         internal static bool HasExtraOption(string extra, string option) =>

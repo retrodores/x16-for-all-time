@@ -30,6 +30,10 @@ namespace CommanderX16
         private readonly TextBox advancedClock = Entry(), advancedRam = Entry();
         private readonly CheckBox advanced = new CheckBox { Text = "Advanced hardware", AutoSize = true };
         private readonly CheckBox fullscreen = new CheckBox { Text = "Fullscreen", AutoSize = true };
+        private readonly CheckBox serialCard = new CheckBox
+        {
+            Text = "Enable serial card (-serialcard)", AutoSize = true
+        };
         private readonly CheckBox autorun = new CheckBox { Text = "Run after loading", AutoSize = true };
         private readonly TableLayoutPanel hardware = Table(), advancedFields = Table();
         private readonly TextBox preview = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
@@ -102,6 +106,7 @@ namespace CommanderX16
             AddRow(launchFields, hardware);
             AddRow(launchFields, Pair("ROM", rom, Button("Browse…", PickRom)));
             AddRow(launchFields, Pair("Startup", autorun));
+            AddRow(launchFields, serialCard);
             AddRow(launchFields, Pair("Extra arguments", extra));
             AddRow(body, launchFields);
             AddRow(body, new Label { Text = program == null ? "Arguments preview" : "Command preview", AutoSize = true });
@@ -152,7 +157,7 @@ namespace CommanderX16
                 box.SelectedIndexChanged += (sender, args) => UpdatePreview();
             foreach (var box in new[] { gif, extra, rom, sd, fs, advancedClock, advancedRam })
                 box.TextChanged += (sender, args) => UpdatePreview();
-            foreach (var box in new[] { fullscreen, autorun })
+            foreach (var box in new[] { fullscreen, autorun, serialCard })
                 box.CheckedChanged += (sender, args) => UpdatePreview();
             advanced.CheckedChanged += (sender, args) =>
             {
@@ -249,7 +254,14 @@ namespace CommanderX16
             autorun.Checked = source.AutoRun;
             fullscreen.Checked = source.Fullscreen;
             gif.Text = source.Gif ?? "";
+            serialCard.Enabled = Emulator?.SupportsSerialCard == true;
+            serialCard.Checked = serialCard.Enabled && source.EnableSerialCard != false;
             extra.Text = source.Extra ?? "";
+            if (serialCard.Enabled)
+            {
+                extra.Text = Launch.RemoveSerialCardOption(source.Extra, out var address);
+                options.SerialCardAddress = address ?? source.SerialCardAddress;
+            }
             rom.Text = source.Rom ?? "";
             sd.Text = source.SdCard ?? "";
             fs.Text = source.FsRoot ?? "";
@@ -358,6 +370,12 @@ namespace CommanderX16
             options.Fullscreen = fullscreen.Checked;
             options.Gif = gif.Text.Trim();
             options.Extra = extra.Text.Trim();
+            if (serialCard.Enabled)
+            {
+                options.EnableSerialCard = serialCard.Checked;
+                options.Extra = Launch.RemoveSerialCardOption(options.Extra, out var address);
+                options.SerialCardAddress = address ?? options.SerialCardAddress;
+            }
             options.Rom = rom.Text.Trim();
             options.SdCard = sd.Text.Trim();
             options.FsRoot = fs.Text.Trim();

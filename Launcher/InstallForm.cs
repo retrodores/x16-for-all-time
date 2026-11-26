@@ -14,6 +14,11 @@ namespace CommanderX16
         private readonly ComboBox releases = Combo();
         private readonly TextBox parent = Entry(), folderName = Entry();
         private readonly TextBox destination = new TextBox { ReadOnly = true, Dock = DockStyle.Fill };
+        private readonly CheckBox serialOverlay = new CheckBox
+        {
+            Text = "Install Serial/Network overlay (R49 Win64)", AutoSize = true, Enabled = false
+        };
+        private bool changingRelease;
         private readonly CheckBox overwrite = new CheckBox { Text = "Overwrite existing installation", AutoSize = true };
         private readonly ProgressBar activity = new ProgressBar
         {
@@ -33,7 +38,7 @@ namespace CommanderX16
             Text = "Install or update X16Emu";
             Font = new Font("Segoe UI", 10);
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(730, 360);
+            ClientSize = new Size(730, 390);
             MinimumSize = new Size(645, 385);
             StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = false;
@@ -51,6 +56,7 @@ namespace CommanderX16
             };
             AddRow(body, intro);
             AddRow(body, Pair("Windows release", releases, refresh));
+            AddRow(body, serialOverlay);
             var browse = Button("Browse…", Browse);
             AddRow(body, Pair("Install parent", parent, browse));
             parent.EnabledChanged += (sender, args) => browse.Enabled = parent.Enabled;
@@ -72,9 +78,21 @@ namespace CommanderX16
             install.Click += async (sender, args) => await Install();
             releases.SelectedIndexChanged += (sender, args) =>
             {
+                changingRelease = true;
                 overwrite.Checked = false;
+                serialOverlay.Checked = false;
                 var selected = releases.SelectedItem as Release;
                 folderName.Text = selected == null ? "" : DefaultFolder(selected);
+                changingRelease = false;
+                UpdateDestination();
+            };
+            serialOverlay.CheckedChanged += (sender, args) =>
+            {
+                if (changingRelease) return;
+                var selected = (Release)releases.SelectedItem;
+                string stock = DefaultFolder(selected);
+                if (Same(folderName.Text, stock) || Same(folderName.Text, stock + "-serial-network"))
+                    folderName.Text = stock + (serialOverlay.Checked ? "-serial-network" : "");
                 UpdateDestination();
             };
             parent.TextChanged += (sender, args) => UpdateDestination();
@@ -110,8 +128,9 @@ namespace CommanderX16
         {
             install.Enabled = overwrite.Enabled = false;
             destination.Text = "";
-            if (busy) return;
             var selected = releases.SelectedItem as Release;
+            serialOverlay.Enabled = !busy && SerialNetworkOverlay.Supports(selected);
+            if (busy) return;
             if (selected == null)
             {
                 status.Text = "Check for available Windows releases.";
@@ -156,6 +175,7 @@ namespace CommanderX16
             activity.Visible = value;
             releases.Enabled = parent.Enabled = folderName.Enabled = refresh.Enabled = !value;
             install.Enabled = overwrite.Enabled = false;
+            serialOverlay.Enabled = !value && SerialNetworkOverlay.Supports(releases.SelectedItem as Release);
             if (!value) UpdateDestination();
         }
 
@@ -213,11 +233,12 @@ namespace CommanderX16
                     if (!LauncherDialogs.Confirm(this, "Replace this installation? The old folder and its contents will be permanently deleted after the replacement is registered." +
                         Environment.NewLine + Environment.NewLine + path, Text)) return;
                 }
+                bool withOverlay = serialOverlay.Checked && SerialNetworkOverlay.Supports(selected);
                 SetBusy(true);
                 status.Text = "Preparing " + selected.Tag + "…";
                 var result = await PowerShell.Execute(new Request
                 {
-                    Action = "Install", Release = selected, Destination = path, Overwrite = replace
+                    Action = "Install", Release = selected, Destination = path, Overwrite = replace, SerialOverlay = withOverlay
                 }, new Progress<string>(step => { if (busy) status.Text = step; }));
                 backup = result.Backup;
                 writtenExe = result.Exe;
@@ -237,6 +258,7 @@ namespace CommanderX16
                     emulator.Release = selected.Tag;
                     emulator.Asset = selected.Asset;
                     emulator.InstallRoot = path;
+                    emulator.SerialOverlayVersion = withOverlay ? SerialNetworkOverlay.Version : null;
                 });
                 recorded = true;
                 EmulatorId = id;
