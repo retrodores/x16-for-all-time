@@ -75,7 +75,10 @@ namespace CommanderX16
             pages.DrawItem += (sender, args) =>
             {
                 var page = pages.TabPages[args.Index];
-                args.DrawBackground();
+                if (args.Index == pages.SelectedIndex)
+                    args.Graphics.FillRectangle(SystemBrushes.Control, args.Bounds);
+                else
+                    args.DrawBackground();
                 TextRenderer.DrawText(args.Graphics, page.Text, pages.Font, args.Bounds,
                     page.Enabled ? SystemColors.ControlText : SystemColors.GrayText,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
