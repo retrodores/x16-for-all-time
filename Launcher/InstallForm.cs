@@ -25,7 +25,7 @@ namespace CommanderX16
             Dock = DockStyle.Top, Height = 16, Style = ProgressBarStyle.Marquee, Visible = false,
             MarqueeAnimationSpeed = 25, AccessibleName = "Emulator installer activity"
         };
-        private readonly Label status = new Label { AutoSize = true, MaximumSize = new Size(600, 0) };
+        private readonly Label status = new Label { AutoSize = true };
         private readonly Button install = Button("Install"), refresh = Button("Check for versions");
         private readonly TableLayoutPanel body = Table();
         private bool busy;
@@ -38,23 +38,19 @@ namespace CommanderX16
             Text = "Install or update X16Emu";
             Font = new Font("Segoe UI", 10);
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(730, 390);
+            ClientSize = new Size(730, 450);
             MinimumSize = new Size(645, 385);
             StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = false;
             MaximizeBox = false;
             body.Padding = new Padding(14);
-            body.AutoSize = false;
-            body.Dock = DockStyle.Fill;
-            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            ClientSizeChanged += (sender, args) => status.MaximumSize = new Size(Math.Max(1, ClientSize.Width - body.Padding.Horizontal - 12), 0);
-            Controls.Add(body);
             var intro = new Label
             {
                 Text = "Choose a release. Each version installs into its own folder.",
                 AutoSize = true, Margin = new Padding(0, 0, 0, 10)
             };
             AddRow(body, intro);
+            WrapText(intro, body);
             AddRow(body, Pair("Windows release", releases, refresh));
             AddRow(body, serialOverlay);
             var browse = Button("Browse…", Browse);
@@ -64,12 +60,12 @@ namespace CommanderX16
             AddRow(body, Pair("Destination", destination));
             AddRow(body, overwrite);
             AddRow(body, status);
+            WrapText(status, body);
             AddRow(body, activity);
             var close = Button("Close", Close);
             refresh.EnabledChanged += (sender, args) => close.Enabled = refresh.Enabled;
             close.DialogResult = DialogResult.Cancel;
-            AddRow(body, Flow(install, close));
-            AddRow(body, new Panel(), SizeType.Percent, 100);
+            AddScrollableContent(this, body, Flow(install, close));
             AcceptButton = install;
             CancelButton = close;
 

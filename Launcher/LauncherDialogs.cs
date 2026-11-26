@@ -30,7 +30,9 @@ namespace CommanderX16
                 body.Dock = DockStyle.Fill;
                 body.Padding = new Padding(16);
                 dialog.Controls.Add(body);
-                AddRow(body, new Label { Text = summary, AutoSize = true, MaximumSize = new Size(390, 0) });
+                var explanation = new Label { Text = summary, AutoSize = true };
+                AddRow(body, explanation);
+                WrapText(explanation, body);
                 AddRow(body, new TextBox
                 {
                     Text = string.Join(Environment.NewLine, paths), Multiline = true, ReadOnly = true,
@@ -59,7 +61,7 @@ namespace CommanderX16
             {
                 Text = title, Font = owner.Font, ClientSize = new Size(640, 300), AutoScaleMode = AutoScaleMode.Dpi,
                 StartPosition = FormStartPosition.CenterParent, ShowInTaskbar = false,
-                MinimizeBox = false
+                MinimumSize = new Size(360, 220), MinimizeBox = false
             })
             {
                 var body = Table();

@@ -71,6 +71,7 @@ namespace CommanderX16
             catalogTree.AfterSelect += (sender, args) => correction.Enabled = catalogTree.SelectedNode?.Tag is CatalogProgram;
             AddRow(body, Flow(openProject, installProgram, downloadProgram, correction, catalogActivity));
             AddRow(body, catalogStatus);
+            WrapText(catalogStatus, body);
             UpdateCatalogSelection();
 
             tabs.SelectedIndexChanged += async (sender, args) =>

@@ -90,10 +90,9 @@ namespace CommanderX16
             BuildKitPage(kitPage, pages, start);
 
             var emulatorBody = Table();
-            emulatorBody.AutoSize = false;
-            emulatorBody.Dock = DockStyle.Fill;
-            emulatorPage.Controls.Add(emulatorBody);
+            AddScrollableContent(emulatorPage, emulatorBody);
             AddRow(emulatorBody, emulatorRequired);
+            WrapText(emulatorRequired, emulatorBody);
             var selections = Table();
             var buildActions = Flow(Button("Install or update…", ShowInstall), Button("Register existing…", () => EditEmulator(null)));
             buildActions.Dock = DockStyle.None;
@@ -111,6 +110,7 @@ namespace CommanderX16
             AddRow(profileSection, profileDefault);
             AddRow(emulatorBody, profileSection);
             AddRow(emulatorBody, status);
+            WrapText(status, emulatorBody);
 
             editBuild.Click += (sender, args) => EditEmulator(SelectedEmulator);
             openBuildFolder.Click += (sender, args) => Attempt(OpenEmulatorFolder);
@@ -310,12 +310,11 @@ namespace CommanderX16
                 MinimizeBox = false, MaximizeBox = false
             })
             {
-                var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
                 var body = Table();
                 body.Padding = new Padding(14);
-                scroll.Controls.Add(body);
-                dialog.Controls.Add(scroll);
-                AddRow(body, new Label { Text = message, AutoSize = true, MaximumSize = new Size(590, 0) });
+                var explanation = new Label { Text = message, AutoSize = true };
+                AddRow(body, explanation);
+                WrapText(explanation, body);
                 var path = Entry();
                 path.ReadOnly = true;
                 path.Text = folder;
@@ -328,8 +327,7 @@ namespace CommanderX16
                 delete.DialogResult = DialogResult.Yes;
                 delete.Enabled = Directory.Exists(folder);
                 var actions = Flow(remove, delete, cancel);
-                actions.Dock = DockStyle.Bottom;
-                dialog.Controls.Add(actions);
+                AddScrollableContent(dialog, body, actions);
                 dialog.AcceptButton = cancel;
                 dialog.CancelButton = cancel;
                 var choice = LauncherDialogs.Show(dialog, this);
@@ -395,11 +393,7 @@ namespace CommanderX16
             })
             {
                 var body = Table();
-                body.AutoSize = false;
-                body.Dock = DockStyle.Fill;
                 body.Padding = new Padding(16);
-                body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-                dialog.Controls.Add(body);
                 var identity = Table();
                 identity.ColumnCount = 2;
                 identity.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -426,12 +420,9 @@ namespace CommanderX16
                     "Launcher issue", null)));
                 AddRow(body, AboutLink("Retrodores on GitHub", "https://github.com/retrodores"));
                 AddRow(body, AboutLink("Commander X16 emulator", "https://github.com/X16Community/x16-emulator"));
-                AddRow(body, new Panel(), SizeType.Percent, 100);
                 var close = Button("Close");
                 close.DialogResult = DialogResult.OK;
-                close.Anchor = AnchorStyles.Right;
-                close.Margin = new Padding(0, 12, 0, 0);
-                AddRow(body, close);
+                AddScrollableContent(dialog, body, Flow(close));
                 dialog.AcceptButton = dialog.CancelButton = close;
                 dialog.ActiveControl = close;
                 LauncherDialogs.Show(dialog, this);
@@ -496,18 +487,72 @@ namespace CommanderX16
 
         internal static void AddRow(TableLayoutPanel table, Control child, SizeType type = SizeType.AutoSize, float height = 0)
         {
+            if (table.ColumnCount == 1 && table.ColumnStyles.Count == 0)
+                table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             int row = table.RowCount++;
             table.RowStyles.Add(new RowStyle(type, height));
             table.Controls.Add(child, 0, row);
+        }
+
+        internal static void AddScrollableContent(Control host, TableLayoutPanel body, FlowLayoutPanel footer = null)
+        {
+            var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+            scroll.Controls.Add(body);
+            if (footer == null)
+            {
+                host.Controls.Add(scroll);
+                return;
+            }
+
+            var layout = Table();
+            layout.AutoSize = false;
+            layout.Dock = DockStyle.Fill;
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            host.Controls.Add(layout);
+            footer.Padding = new Padding(12, 4, 12, 8);
+            AddRow(layout, scroll, SizeType.Percent, 100);
+            AddRow(layout, footer);
+        }
+
+        internal static void WrapText(Label label, Control container)
+        {
+            void UpdateWidth()
+            {
+                int width = Math.Max(1, container.ClientSize.Width - container.Padding.Horizontal - label.Margin.Horizontal);
+                if (label.MaximumSize.Width != width) label.MaximumSize = new Size(width, 0);
+            }
+            container.ClientSizeChanged += (sender, args) => UpdateWidth();
+            container.HandleCreated += (sender, args) => UpdateWidth();
         }
 
         internal static TableLayoutPanel Pair(string label, Control field, params Control[] actions)
         {
             var table = Table();
             table.ColumnCount = 2 + actions.Length;
+            table.RowCount = 1;
+            table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 148));
             table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             table.Controls.Add(new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
+            // Native single-line editors have their own font-based height.
+            // Stretch them across their cell without forcing the cell's height onto them.
+            field.Dock = DockStyle.None;
+            field.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            if (field is ComboBox || field is TextBox)
+            {
+                void UpdateHeight()
+                {
+                    int height = field is ComboBox combo ? combo.PreferredHeight : ((TextBox)field).PreferredHeight;
+                    var size = new Size(field.MinimumSize.Width, height);
+                    if (field.MinimumSize != size) field.MinimumSize = size;
+                    var rowMinimum = new Size(0, height + field.Margin.Vertical);
+                    if (table.MinimumSize != rowMinimum) table.MinimumSize = rowMinimum;
+                }
+                field.FontChanged += (sender, args) => UpdateHeight();
+                field.HandleCreated += (sender, args) => UpdateHeight();
+                field.DpiChangedAfterParent += (sender, args) => UpdateHeight();
+                UpdateHeight();
+            }
             table.Controls.Add(field, 1, 0);
             for (int i = 0; i < actions.Length; i++)
             {

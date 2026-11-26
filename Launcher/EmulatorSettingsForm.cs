@@ -28,7 +28,6 @@ namespace CommanderX16
             MinimizeBox = false;
             var body = Table();
             body.Padding = new Padding(12);
-            Controls.Add(body);
             name.Text = emulator?.Name ?? "";
             path.Text = emulator?.Exe ?? "";
             standard.Checked = emulator?.UpstreamOptions ?? true;
@@ -38,7 +37,7 @@ namespace CommanderX16
             var confirm = Button(emulator == null ? "Register" : "Save", Confirm);
             var cancel = Button("Cancel");
             cancel.DialogResult = DialogResult.Cancel;
-            AddRow(body, Flow(confirm, cancel));
+            AddScrollableContent(this, body, Flow(confirm, cancel));
             AcceptButton = confirm;
             CancelButton = cancel;
         }

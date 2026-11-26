@@ -70,11 +70,8 @@ namespace CommanderX16
             MaximizeBox = false;
             MinimizeBox = false;
 
-            var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
             var body = Table();
             body.Padding = new Padding(12);
-            scroll.Controls.Add(body);
-            Controls.Add(scroll);
             if (program != null || fixedBuild)
             {
                 name.Text = program?.Name ?? profileName;
@@ -117,9 +114,7 @@ namespace CommanderX16
             confirm = Button("Save", Confirm);
             var actions = clearAction == null ? Flow(confirm, cancel)
                 : Flow(confirm, Button(clearAction, () => DialogResult = DialogResult.Abort), cancel);
-            actions.Dock = DockStyle.Bottom;
-            actions.Padding = new Padding(12, 0, 12, 8);
-            Controls.Add(actions);
+            AddScrollableContent(this, body, actions);
             AcceptButton = confirm;
             CancelButton = cancel;
 

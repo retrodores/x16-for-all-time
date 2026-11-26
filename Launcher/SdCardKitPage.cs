@@ -39,6 +39,7 @@ namespace CommanderX16
             AddRow(body, kitDetails, SizeType.Absolute, 112);
             AddRow(body, Flow(openKit, installKitItem, launchKitItem, kitActivity));
             AddRow(body, kitStatus);
+            WrapText(kitStatus, body);
             refreshKit.Click += async (sender, args) => await LoadKit();
             kitSearch.TextChanged += (sender, args) => ShowKitItems();
             openKit.Click += (sender, args) => OpenKitItem(kitTree.SelectedNode);
