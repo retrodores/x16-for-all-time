@@ -20,7 +20,7 @@ namespace CommanderX16
         private readonly Profile savedOptions;
         private readonly bool editingStartDefaults;
         private readonly ComboBox builds = Combo(), profiles = Combo();
-        private readonly ComboBox cpu = OptionsFor(HardwareOptions.Cpu, value => value == "-c816" ? "65C816" : "65C02");
+        private readonly ComboBox cpu = OptionsFor(HardwareOptions.Cpu, HardwareOptions.CpuName);
         private readonly ComboBox mhz = OptionsFor(HardwareOptions.Clock,
             value => value + " MHz" + (value == "8" ? " (standard)" : ""));
         private readonly ComboBox ram = OptionsFor(HardwareOptions.Ram, value =>

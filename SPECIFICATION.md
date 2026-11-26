@@ -1,6 +1,6 @@
 # X16 For All Time port specification
 
-This document describes the launcher behavior and X16 Files interface implemented by the 0.7.16 beta. It is intended for developers building a native Linux or macOS launcher. The Windows implementation is the reference. A port can choose its own UI, packaging, and settings format.
+This document describes the launcher behavior and X16 Files interface implemented by the Windows beta. It is intended for developers building a native Linux or macOS launcher. The Windows implementation is the reference. A port can choose its own UI, packaging, and settings format.
 
 ## Launcher behavior
 
@@ -8,11 +8,11 @@ This document describes the launcher behavior and X16 Files interface implemente
 | --- | --- |
 | Start | Save, search, and launch local program entries. Each entry has a display name, a PRG path, and either inherited Start defaults or its own emulator and launch options. Duplicate an entry to keep multiple setups for one PRG. Removing an entry keeps its files. |
 | Add PRG | Accept local `.prg` and `.zip` files. Reference a loose PRG in place. Import a ZIP using the archive rules below, and keep the imported files when the entry is saved. Canceling the add operation discards the import. |
-| X16 Files | Browse and search the catalog, open project pages, filter to entries with downloadable packages, and show a count that follows the search and filter. Offer explicit refresh, install or reinstall to Start, and download and launch. |
-| Emulators | Register an existing emulator executable or install platform-appropriate builds side by side. Allow multiple builds, including forks. Each build can have named profiles and a default profile. |
-| Profiles | Use a profile to prefill settings for a Start entry or Start defaults. Saved settings are a copy. Entries set to use Start defaults follow that configuration. Explicitly assigned entries keep their saved settings if the emulator is removed. Use a working Start default or the sole available emulator as a fallback, without overwriting those settings. |
+| X16 Files | Browse and search the catalog, clear the search independently of the download filter, and show a count that follows the search and filter. Provide Expand all and Collapse all for the current results on both X16 Files and SD Card Kit. Open project pages from the catalog. Offer explicit refresh, install or reinstall to Start, and download and launch. |
+| Emulators | Register an existing emulator executable or install platform-appropriate builds side by side. Allow multiple builds, including forks. Each build can have named profiles and a default profile. On first run with no emulator registered, open emulator setup and show a dismissible prompt to install or register a build. |
+| Profiles | Use a profile to prefill settings for a Start entry or Start defaults. Saved settings are a copy. Entries set to use Start defaults follow that configuration. Explicitly assigned entries keep their saved settings if the emulator is removed. Use the working Start default or the first available emulator in registration order as a fallback. Managed X16Emu installs create presets for both 65C02 and 65C816 at 2, 4, and 8 MHz and 512, 1024, 1536, and 2048 KiB. New presets and the new Default profile use 2× display scale. Preserve edited profiles on reinstall. |
 
-A Start entry needs a usable emulator and a PRG to launch. Entries can be added or configured before an emulator is installed. The Windows client keeps settings and managed programs in per-user storage. A port can use XDG directories on Linux and Application Support on macOS. Give each imported or downloaded package its own directory to avoid overwriting files shared by existing entries.
+A Start entry needs a usable emulator and a PRG to launch. Register or install an emulator to unlock Start and the catalog tabs in the Windows client. The Windows client keeps settings and managed programs in per-user storage. A port can use XDG directories on Linux and Application Support on macOS. Give each imported or downloaded package its own directory to avoid overwriting files shared by existing entries.
 
 ## X16 Files catalog
 
@@ -66,9 +66,9 @@ The declared format determines whether the launcher offers a download. The serve
 
 ### Install and launch from the catalog
 
-- **Install to Start** downloads the selected package and records its PRG path with the catalog ID. Installation can succeed before the user has registered an emulator.
+- **Install to Start** downloads the selected package and records its PRG path with the catalog ID. The emulator registration unlocks access to the catalog on Windows.
 - **Reinstall to Start** updates the PRG path for the matching catalog ID and keeps the entry's name and launch settings. A failed download, invalid archive, or canceled picker leaves the existing entry intact.
-- **Download and launch** fetches the package and launches its PRG with run-after-load enabled. Use Start defaults when configured. If only one registered emulator executable is available, the reference client uses that build's default profile as a fallback. Otherwise prompt for emulator setup.
+- **Download and launch** fetches the package and launches its PRG with run-after-load enabled. Use the same selection as Start. Use a working explicit assignment for an existing Start entry, then working Start defaults, then the default profile of the first registered emulator with an available executable. Prompt for emulator setup if none are usable.
 - When several supported packages are offered, let the user select one before downloading. A double-click on a downloadable catalog row is a shortcut for install or reinstall.
 
 ## PRG and ZIP handling

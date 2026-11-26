@@ -624,9 +624,7 @@ namespace CommanderX16
         {
             if (store.Data.Emulators.Count == 0)
                 return "Register or install an X16Emu build on the Emulators tab.";
-            if (!store.Data.Emulators.Any(build => File.Exists(build.Exe)))
-                return "No registered emulator executable was found. Check the executable paths on the Emulators tab.";
-            return "Choose an emulator in Start defaults, or set one for this program in Launch settings.";
+            return "No registered emulator executable was found. Check the executable paths on the Emulators tab.";
         }
 
         private async Task RunSelected(ProgramEntry program)

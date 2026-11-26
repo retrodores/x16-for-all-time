@@ -123,6 +123,14 @@ namespace CommanderX16
             deleteProfile.Click += (sender, args) => Attempt(RemoveProfile);
             defaultProfile.Click += (sender, args) => Attempt(SetDefaultProfile);
             FormClosing += (sender, args) => { if (launching || catalogBusy || loadingKit) args.Cancel = true; };
+            Shown += (sender, args) =>
+            {
+                if (!store.IsFirstRun || store.Data.Emulators.Count != 0) return;
+                LauncherDialogs.Message(this, "No emulator is registered. On the Emulators tab, choose Install or update " +
+                    "to install X16Emu, or Register existing if you already have it.", "Set up an emulator");
+                // Persist the initial settings so the first-run dialog only appears once.
+                Attempt(() => store.Save(settings => { }));
+            };
             BindEmulators(null, null);
         }
 
@@ -296,11 +304,11 @@ namespace CommanderX16
                 string names = string.Join(Environment.NewLine, affected.Take(10).Select(program => "• " + program.Name));
                 if (affected.Length > 10)
                     names += Environment.NewLine + "…and " + (affected.Length - 10) + " more.";
-                message += Environment.NewLine + Environment.NewLine + "These entries will need a new emulator:" +
+                message += Environment.NewLine + Environment.NewLine + "These entries will use the Start fallback when available:" +
                     Environment.NewLine + names;
             }
             if (store.Data.StartEmulatorId == emulator.Id)
-                message += Environment.NewLine + Environment.NewLine + "Choose a new emulator in Start defaults.";
+                message += Environment.NewLine + Environment.NewLine + "Start will use the first available emulator unless you choose new Start defaults.";
             string folder = EmulatorFolders.Root(emulator);
             bool filesDeleted = false;
             using (var dialog = new Form

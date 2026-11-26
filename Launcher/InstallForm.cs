@@ -255,6 +255,7 @@ namespace CommanderX16
                     emulator.Asset = selected.Asset;
                     emulator.InstallRoot = path;
                     emulator.SerialOverlayVersion = withOverlay ? SerialNetworkOverlay.Version : null;
+                    settings.EnsureHardwareProfiles(emulator);
                 });
                 recorded = true;
                 EmulatorId = id;

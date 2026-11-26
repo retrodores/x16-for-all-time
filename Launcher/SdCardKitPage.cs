@@ -33,8 +33,9 @@ namespace CommanderX16
         {
             var body = PageBody(page);
             kitSearch.AccessibleName = "Find a program in the SD Card Kit";
-            AddRow(body, Pair("Find a program", kitSearch, refreshKit));
-            AddRow(body, Flow(new CheckBox { Text = "Downloadable only", AutoSize = true, Checked = true, Enabled = false }, kitCount));
+            AddRow(body, BrowserSearch(kitSearch, refreshKit));
+            var downloadable = new CheckBox { Text = "Downloadable only", AutoSize = true, Checked = true, Enabled = false };
+            AddRow(body, BrowserTreeActions(kitTree, downloadable, kitCount));
             AddRow(body, kitTree, SizeType.Percent, 100);
             AddRow(body, kitDetails, SizeType.Absolute, 112);
             AddRow(body, Flow(openKit, installKitItem, launchKitItem, kitActivity));

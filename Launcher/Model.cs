@@ -63,8 +63,7 @@ namespace CommanderX16
                 return emulator;
             }
 
-            var available = Emulators.Where(build => File.Exists(build.Exe)).Take(2).ToArray();
-            emulator = available.Length == 1 ? available[0] : null;
+            emulator = Emulators.FirstOrDefault(build => File.Exists(build.Exe));
             options = DefaultProfile(emulator) ?? Profile.CopyOptions(null, emulator);
             return emulator;
         }
@@ -179,17 +178,46 @@ namespace CommanderX16
             foreach (var build in Emulators)
             {
                 if (DefaultProfile(build) != null) continue;
-                string name = "Default";
-                for (int suffix = 2; Profiles.Any(existing => existing.EmulatorId == build.Id &&
-                    string.Equals(existing.Name, name, StringComparison.OrdinalIgnoreCase)); suffix++)
-                    name = "Default (" + suffix + ")";
                 var profile = Profile.Snapshot(null, build);
                 profile.Id = Guid.NewGuid().ToString("N");
                 profile.EmulatorId = build.Id;
-                profile.Name = name;
+                profile.Name = UniqueProfileName(build.Id, "Default");
                 Profiles.Add(profile);
                 build.DefaultProfileId = profile.Id;
             }
+        }
+
+        public void EnsureHardwareProfiles(Emulator emulator)
+        {
+            if (!emulator.UpstreamOptions) return;
+            EnsureDefaultProfiles();
+            foreach (string cpu in HardwareOptions.Cpu)
+            foreach (string mhz in HardwareOptions.Clock)
+            foreach (string ram in HardwareOptions.Ram)
+            {
+                // Stable across reinstalls, even if the user renames or edits the preset.
+                string id = $"{emulator.Id}-hardware{cpu}-{mhz}-{ram}";
+                if (Profiles.Any(existing => existing.Id == id)) continue;
+                var profile = Profile.Snapshot(null, emulator);
+                profile.Id = id;
+                profile.EmulatorId = emulator.Id;
+                string name = $"{HardwareOptions.CpuName(cpu)} · {mhz} MHz · {ram} KiB";
+                profile.Name = UniqueProfileName(emulator.Id, name);
+                profile.Cpu = cpu;
+                profile.Mhz = mhz;
+                profile.Ram = ram;
+                profile.Scale = "2";
+                Profiles.Add(profile);
+            }
+        }
+
+        private string UniqueProfileName(string emulatorId, string baseName)
+        {
+            string name = baseName;
+            for (int suffix = 2; Profiles.Any(profile => profile.EmulatorId == emulatorId &&
+                MainForm.Same(profile.Name, name)); suffix++)
+                name = $"{baseName} ({suffix})";
+            return name;
         }
 
         public void RemoveEmulator(Emulator emulator)
@@ -412,6 +440,7 @@ namespace CommanderX16
         private readonly string path;
         private readonly FileStream sessionLock;
         public Settings Data { get; private set; }
+        public bool IsFirstRun { get; }
 
         public SettingsStore(string directory)
         {
@@ -429,7 +458,8 @@ namespace CommanderX16
             try
             {
                 string source = File.Exists(path) ? path : path + ".bak";
-                Data = File.Exists(source) ? Json.Read<Settings>(File.ReadAllBytes(source)) : new Settings();
+                IsFirstRun = !File.Exists(source);
+                Data = IsFirstRun ? new Settings() : Json.Read<Settings>(File.ReadAllBytes(source));
                 if (Data == null || Data.Format != 1 || Data.Emulators == null || Data.Profiles == null)
                     throw new InvalidDataException("Unsupported settings file. Your settings were left on disk.");
                 if (!Data.StartOrderInitialized || !Data.BuildDefaultsMigrated || !Data.RomCopiesMigrated || !Data.ProfileCopiesMigrated || !Data.GenericExtrasMigrated || !Data.EntryOptionsMigrated || Data.Programs == null)

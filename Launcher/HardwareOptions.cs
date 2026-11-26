@@ -11,6 +11,8 @@ namespace CommanderX16
         public static readonly string[] Ram = { "512", "1024", "1536", "2048" };
         public static readonly string[] Scale = { "1", "2", "3", "4" };
 
+        public static string CpuName(string value) => value == "-c816" ? "65C816" : "65C02";
+
         public static bool NeedsAdvanced(Profile profile) =>
             OutsideStandard(profile.Mhz, Clock) || OutsideStandard(profile.Ram, Ram);
 

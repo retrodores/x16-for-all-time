@@ -41,6 +41,34 @@ namespace CommanderX16
             MarqueeAnimationSpeed = 25, Visible = false, AccessibleName = "Download activity"
         };
 
+        private static TableLayoutPanel BrowserSearch(TextBox search, Button refresh)
+        {
+            var clear = Button("Clear", () =>
+            {
+                search.Clear();
+                search.Focus();
+            });
+            clear.AccessibleName = "Clear program search";
+            clear.Enabled = search.Enabled && search.TextLength > 0;
+            search.TextChanged += (sender, args) => clear.Enabled = search.Enabled && search.TextLength > 0;
+            search.EnabledChanged += (sender, args) => clear.Enabled = search.Enabled && search.TextLength > 0;
+            return Pair("Find a program", search, clear, refresh);
+        }
+
+        private static FlowLayoutPanel BrowserTreeActions(TreeView tree, Control filter, Label count)
+        {
+            var expand = Button("Expand all", tree.ExpandAll);
+            var collapse = Button("Collapse all", () =>
+            {
+                var selected = tree.SelectedNode;
+                while (selected?.Parent != null) selected = selected.Parent;
+                tree.CollapseAll();
+                tree.SelectedNode = selected;
+            });
+            tree.EnabledChanged += (sender, args) => expand.Enabled = collapse.Enabled = tree.Enabled;
+            return Flow(filter, count, expand, collapse);
+        }
+
         private void ShowInstalledEntry(string id, TabControl tabs, TabPage start, string source)
         {
             if (id == null) return;
@@ -58,8 +86,8 @@ namespace CommanderX16
             var body = PageBody(page);
             catalogSearch.AccessibleName = "Find a catalog program";
             catalogTree.AccessibleName = "X16 Files programs";
-            AddRow(body, Pair("Find a program", catalogSearch, refreshCatalog));
-            AddRow(body, Flow(downloadableOnly, catalogCount));
+            AddRow(body, BrowserSearch(catalogSearch, refreshCatalog));
+            AddRow(body, BrowserTreeActions(catalogTree, downloadableOnly, catalogCount));
             AddRow(body, catalogTree, SizeType.Percent, 100);
             AddRow(body, catalogDetails, SizeType.Absolute, 112);
             var correction = Button("Report listing correction…", () => Attempt(() =>
@@ -298,7 +326,8 @@ namespace CommanderX16
             Func<IProgress<string>, Task<(string Path, string Root)>> getProgram,
             Action<bool, string> setBusy, Label status, string installedId)
         {
-            var emulator = store.Data.ResolveLaunch(null, out var source);
+            var installed = store.Data.Programs.FirstOrDefault(entry => entry.Id == installedId);
+            var emulator = store.Data.ResolveLaunch(installed, out var source);
             if (emulator == null)
             {
                 LauncherDialogs.Message(this, MissingLaunchSetup(), "Download and launch");
@@ -326,7 +355,7 @@ namespace CommanderX16
                 try
                 {
                     if (RepairStartEmulator(installedId, emulator, options, program.Path, program.Root))
-                        status.Text = "Emulator launched. The Start entry now uses this emulator.";
+                        status.Text = "Emulator launched. The Start entry was updated.";
                 }
                 catch (Exception error)
                 {
@@ -359,15 +388,21 @@ namespace CommanderX16
             var installed = store.Data.Programs.FirstOrDefault(entry => entry.Id == installedId);
             if (installed == null || store.Data.ConfiguredLaunchEmulator(installed) != null ||
                 store.Data.FindEmulator(emulator.Id) == null) return false;
+            bool repairAssignment = !store.Data.UsesStartDefaults(installed);
+            bool repairPath = !File.Exists(installed.Path);
+            if (!repairAssignment && !repairPath) return false;
 
             store.Save(data =>
             {
                 var entry = data.Programs.Single(item => item.Id == installedId);
-                entry.EmulatorId = emulator.Id;
-                entry.Options = Profile.Snapshot(options, emulator);
-                entry.RequiresEmulatorSelection = false;
-                entry.ProfileId = null;
-                if (!File.Exists(entry.Path))
+                if (repairAssignment)
+                {
+                    entry.EmulatorId = emulator.Id;
+                    entry.Options = Profile.Snapshot(options, emulator);
+                    entry.RequiresEmulatorSelection = false;
+                    entry.ProfileId = null;
+                }
+                if (repairPath)
                 {
                     entry.Path = path;
                     entry.SdKitRoot = root;
