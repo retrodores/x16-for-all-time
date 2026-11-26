@@ -1,5 +1,5 @@
 #define AppName "X16 For All Time"
-#define AppVersion "0.7.25"
+#define AppVersion "0.7.26"
 #define BinDir "..\Launcher\bin\Release"
 
 [Setup]
