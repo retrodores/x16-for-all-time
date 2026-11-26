@@ -17,7 +17,8 @@ namespace CommanderX16
         private readonly Button run = Button("Run"), copy = Button("Copy PowerShell");
         private readonly Label launchStatus = new Label { AutoSize = true, ForeColor = Navy };
         private readonly Label status = new Label { AutoSize = true, ForeColor = Navy };
-        private readonly Button editBuild = Button("Edit emulator…"), removeBuild = Button("Remove from list…");
+        private readonly Button editBuild = Button("Edit emulator…"), removeBuild = Button("Remove emulator…");
+        private readonly Button openBuildFolder = Button("Open folder");
         private readonly Button newProfile = Button("New profile…"), editProfile = Button("Edit profile…"),
             duplicateProfile = Button("Duplicate…"), deleteProfile = Button("Delete…"), defaultProfile = Button("Set as default");
         private readonly Label profileDefault = new Label { AutoSize = true };
@@ -81,7 +82,7 @@ namespace CommanderX16
             buildActions.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             AddRow(selections, buildActions);
             AddRow(selections, Pair("Emulator", emulators, editBuild, removeBuild));
-            AddRow(selections, Pair("Executable", emulatorPath));
+            AddRow(selections, Pair("Executable", emulatorPath, openBuildFolder));
             AddRow(emulatorBody, selections);
 
             var profileSection = Table();
@@ -93,6 +94,7 @@ namespace CommanderX16
             AddRow(emulatorBody, status);
 
             editBuild.Click += (sender, args) => EditEmulator(SelectedEmulator);
+            openBuildFolder.Click += (sender, args) => Attempt(OpenEmulatorFolder);
             removeBuild.Click += (sender, args) => Attempt(RemoveEmulator);
             emulators.SelectedIndexChanged += (sender, args) => { if (!binding) BindProfiles(null); };
             profiles.SelectedIndexChanged += (sender, args) => { if (!binding) UpdateProfileActions(); };
@@ -135,7 +137,7 @@ namespace CommanderX16
         {
             var emulator = SelectedEmulator;
             emulatorPath.Text = emulator?.Exe ?? "";
-            editBuild.Enabled = removeBuild.Enabled = newProfile.Enabled = emulator != null;
+            editBuild.Enabled = removeBuild.Enabled = openBuildFolder.Enabled = newProfile.Enabled = emulator != null;
             profiles.Enabled = editProfile.Enabled = duplicateProfile.Enabled = deleteProfile.Enabled = SelectedProfile != null;
             var currentDefault = store.Data.DefaultProfile(emulator);
             defaultProfile.Enabled = SelectedProfile != null && SelectedProfile.Id != currentDefault?.Id;
@@ -241,12 +243,23 @@ namespace CommanderX16
             });
         }
 
+        private void OpenEmulatorFolder()
+        {
+            var emulator = SelectedEmulator;
+            if (emulator == null) return;
+            var folder = EmulatorFolders.Root(emulator);
+            if (!Directory.Exists(folder))
+                throw new DirectoryNotFoundException("The emulator folder could not be found." + Environment.NewLine + folder);
+            Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
+        }
+
         private void RemoveEmulator()
         {
             var emulator = SelectedEmulator;
             if (emulator == null) return;
             var affected = store.Data.Programs.Where(program => program.EmulatorId == emulator.Id).ToArray();
-            string message = "Remove " + emulator.Name + " from the emulator list?";
+            string message = "Choose what to do with " + emulator.Name + "." + Environment.NewLine + Environment.NewLine +
+                "Remove from list leaves the folder on disk. Delete emulator files permanently deletes the folder and its contents.";
             if (affected.Length != 0)
             {
                 string names = string.Join(Environment.NewLine, affected.Take(10).Select(program => "• " + program.Name));
@@ -258,6 +271,7 @@ namespace CommanderX16
             if (store.Data.StartEmulatorId == emulator.Id)
                 message += Environment.NewLine + Environment.NewLine + "Choose a new emulator in Start defaults.";
             string folder = EmulatorFolders.Root(emulator);
+            bool filesDeleted = false;
             using (var dialog = new Form
             {
                 Text = "Remove emulator", Font = Font, AutoScaleMode = AutoScaleMode.Dpi,
@@ -271,26 +285,30 @@ namespace CommanderX16
                 scroll.Controls.Add(body);
                 dialog.Controls.Add(scroll);
                 AddRow(body, new Label { Text = message, AutoSize = true, MaximumSize = new Size(590, 0) });
-                var delete = new CheckBox { Text = "Also delete the emulator directory and its contents", AutoSize = true };
                 var path = Entry();
                 path.ReadOnly = true;
                 path.Text = folder;
-                AddRow(body, delete);
                 AddRow(body, Pair("Emulator directory", path));
                 var cancel = Button("Cancel");
                 cancel.DialogResult = DialogResult.Cancel;
                 var remove = Button("Remove from list");
                 remove.DialogResult = DialogResult.OK;
-                delete.CheckedChanged += (sender, args) => remove.Text = delete.Checked ? "Remove and delete" : "Remove from list";
-                var actions = Flow(remove, cancel);
+                var delete = Button("Delete emulator files…");
+                delete.DialogResult = DialogResult.Yes;
+                delete.Enabled = Directory.Exists(folder);
+                var actions = Flow(remove, delete, cancel);
                 actions.Dock = DockStyle.Bottom;
                 dialog.Controls.Add(actions);
                 dialog.AcceptButton = cancel;
                 dialog.CancelButton = cancel;
-                if (LauncherDialogs.Show(dialog, this) != DialogResult.OK) return;
-                if (delete.Checked)
+                var choice = LauncherDialogs.Show(dialog, this);
+                if (choice != DialogResult.OK && choice != DialogResult.Yes) return;
+                if (choice == DialogResult.Yes)
                 {
                     EmulatorFolders.CheckDelete(folder, store.Data, emulator);
+                    if (!LauncherDialogs.Confirm(this,
+                        "Permanently delete this emulator directory and all its contents?" + Environment.NewLine +
+                        Environment.NewLine + folder, "Delete emulator files")) return;
                     string staged = folder + ".removing-" + Guid.NewGuid().ToString("N").Substring(0, 8);
                     Directory.Move(folder, staged);
                     try { store.Save(settings => settings.RemoveEmulator(emulator)); }
@@ -300,7 +318,11 @@ namespace CommanderX16
                         catch (Exception error) { throw new IOException("Could not restore the emulator folder from " + staged, error); }
                         throw;
                     }
-                    try { Directory.Delete(staged, true); }
+                    try
+                    {
+                        Directory.Delete(staged, true);
+                        filesDeleted = true;
+                    }
                     catch (Exception error)
                     {
                         ShowError(new IOException("Emulator removed from list. Could not finish deleting files at " + staged +
@@ -312,7 +334,7 @@ namespace CommanderX16
             }
             BindEmulators(null, null);
             RefreshPrograms();
-            status.Text = "Emulator removed from list";
+            status.Text = filesDeleted ? "Emulator files deleted" : "Emulator removed from list";
         }
 
         private void ShowInstall()

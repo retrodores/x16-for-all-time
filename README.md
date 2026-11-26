@@ -32,7 +32,7 @@ Use **Register existing** for an unpacked folder or executable, including rename
 
 Each build starts with a **Default** profile and can have additional named profiles with **New profile**, **Edit**, **Duplicate**, **Delete**, and **Set as default**. Profiles prefill PRG settings and Start defaults. Saving either makes an independent copy, including the effective ROM and extra arguments. The standard controls show Commander X16 hardware choices. **CPU** offers 65C02 and 65C816. **Advanced hardware** contains custom clock and RAM values. Display scaling is available in the same editor.
 
-**Remove from list** removes a registration and keeps its files on disk. PRGs referring to the build keep their options and ask for a new emulator. Profiles from removed builds remain available to copy.
+**Open folder** opens the selected emulator’s directory in File Explorer. **Remove emulator** offers **Remove from list** to keep the folder on disk or **Delete emulator files** to permanently delete the folder after confirmation. PRGs referring to the build keep their options and ask for a new emulator. Profiles from removed builds remain available to copy.
 
 ## Linux and macOS ports
 
@@ -44,7 +44,7 @@ Use a Visual Studio Developer PowerShell with the .NET Framework 4.8 targeting p
 
 ## Installing and removing emulators
 
-The installer shows progress while checking releases, downloading, verifying, extracting and installing. **Overwrite existing installation** permanently deletes the previous emulator folder after the replacement is installed and registered. If replacement or registration fails, the launcher attempts to restore the original folder. Existing registrations keep their profiles and PRG assignments. **Remove from list** leaves files on disk unless you choose **Also delete the emulator directory and its contents**. PRG entries and their settings can be edited before an emulator is available.
+The installer shows progress while checking releases, downloading, verifying, extracting and installing. **Overwrite existing installation** permanently deletes the previous emulator folder after the replacement is installed and registered. If replacement or registration fails, the launcher attempts to restore the original folder. Existing registrations keep their profiles and PRG assignments. PRG entries and their settings can be edited before an emulator is available.
 
 ## Contributing
 
