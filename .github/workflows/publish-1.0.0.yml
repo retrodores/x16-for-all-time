@@ -1,0 +1,73 @@
+name: Publish X16 For All Time 1.0
+
+on:
+  push:
+    branches: [release-publish-1.0.0]
+    paths: [.github/workflows/publish-1.0.0.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - name: Check out the release tag
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: refs/tags/v1.0.0
+          persist-credentials: false
+
+      - name: Find MSBuild
+        uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce
+
+      - name: Build and test the installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\Build.ps1
+          $installer = Join-Path $PWD 'dist\X16ForAllTime-1.0.0-Setup.exe'
+          Move-Item 'dist\X16ForAllTime-Setup.exe' $installer
+          $installDir = Join-Path $env:RUNNER_TEMP 'x16-fat-install-test'
+          $log = Join-Path $env:RUNNER_TEMP 'x16-fat-install.log'
+          $setup = Start-Process -FilePath $installer -Wait -PassThru -ArgumentList @(
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/NOICONS',
+            ('/DIR="' + $installDir + '"'), ('/LOG="' + $log + '"')
+          )
+          if ($setup.ExitCode -ne 0) {
+            if (Test-Path $log) { Get-Content $log -Tail 50 }
+            throw "Installer exited with status $($setup.ExitCode)."
+          }
+          foreach ($file in @('X16ForAllTime.exe', 'X16ForAllTime.exe.config', 'X16.ps1')) {
+            $built = Get-FileHash (Join-Path 'Launcher\bin\Release' $file)
+            $installed = Get-FileHash (Join-Path $installDir $file)
+            if ($built.Hash -ne $installed.Hash) { throw "Installed $file differs from the build." }
+          }
+          $app = Get-Item (Join-Path $installDir 'X16ForAllTime.exe')
+          if ($app.VersionInfo.FileVersion -ne '1.0.0.0') { throw 'Unexpected installed launcher version.' }
+          Write-Host 'Verified Windows installation and installed launcher version 1.0.0.'
+          Get-FileHash $installer
+
+      - name: Publish the stable GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $notes = @'
+          The first stable release of X16 For All Time, a Windows launcher for Commander X16 programs.
+
+          - Install X16Emu or register an existing emulator. Keep multiple versions and choose the default for Start or for an individual program.
+          - Browse, search, and install programs from X16 Files and the SD Card Kit. Launch a download immediately or add it to Start. Import local PRG, BAS, and ZIP files.
+          - Organize and launch programs from Start, customize their emulator settings, and give each program its own GIF recording path.
+          - Managed X16Emu installs include 24 hardware presets for both CPUs and the standard clock and banked RAM choices, with 2× display scale. The launch settings picker combines equivalent presets and displays up to eight rows.
+          - Optionally install the Serial/Network overlay for R49 Win64 to run programs such as X16 Gopher.
+
+          **Installation:** Download and run the setup file below. Requires Windows 10 or later and .NET Framework 4.8 or later. On first run, choose **Install or update…** or **Register existing…** on the Emulators tab.
+
+          [User guide and wiki](https://github.com/retrodores/x16-for-all-time/wiki)
+          '@
+          $notesFile = Join-Path $env:RUNNER_TEMP 'x16-fat-release-notes.md'
+          Set-Content -LiteralPath $notesFile -Value $notes -Encoding utf8
+          gh release create v1.0.0 'dist/X16ForAllTime-1.0.0-Setup.exe' --repo $env:GITHUB_REPOSITORY --verify-tag --latest --title 'X16 For All Time 1.0' --notes-file $notesFile
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub release publication failed.' }
