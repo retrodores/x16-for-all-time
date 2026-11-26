@@ -24,7 +24,7 @@ namespace CommanderX16
         private readonly Button refreshKit = Button("Refresh from SD Card Kit");
         private readonly Button openKit = Button("Open project page");
         private readonly Button installKitItem = Button("Install to Start");
-        private readonly Button launchKitItem = Button("Download and launch");
+        private readonly Button launchKitItem = Button(RunDownloadLabel);
         private KitItem[] kitItems;
         private string kitRevision;
         private bool loadingKit;

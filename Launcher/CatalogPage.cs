@@ -18,7 +18,8 @@ namespace CommanderX16
         private readonly Button refreshCatalog = Button("Refresh from X16 Files");
         private readonly Button openProject = Button("Open project page");
         private readonly Button installProgram = Button("Install to Start");
-        private readonly Button downloadProgram = Button("Download and launch");
+        private const string RunDownloadLabel = "Download and run once";
+        private readonly Button downloadProgram = Button(RunDownloadLabel);
         private readonly Label catalogStatus = BrowserStatus();
         private readonly ProgressBar catalogActivity = BrowserActivity();
         private CatalogProgram[] catalogPrograms;
@@ -330,7 +331,7 @@ namespace CommanderX16
             var emulator = store.Data.ResolveLaunch(installed, out var source);
             if (emulator == null)
             {
-                LauncherDialogs.Message(this, MissingLaunchSetup(), "Download and launch");
+                LauncherDialogs.Message(this, MissingLaunchSetup(), RunDownloadLabel);
                 return;
             }
 
@@ -352,16 +353,6 @@ namespace CommanderX16
                 request = Launch.Prepare(emulator, options, program.Path, true, program.Root);
                 status.Text = "Starting emulator…";
                 await StartPreparedProgram(request, message => status.Text = message);
-                try
-                {
-                    if (RepairStartEmulator(installedId, emulator, options, program.Path, program.Root))
-                        status.Text = "Emulator launched. The Start entry was updated.";
-                }
-                catch (Exception error)
-                {
-                    status.Text = "Emulator launched. Could not update the Start entry.";
-                    LauncherDialogs.Message(this, error.Message, "Update Start entry");
-                }
             }
             catch (DownloadForbiddenException error)
             {
@@ -372,7 +363,7 @@ namespace CommanderX16
                 status.Text = request == null ? "Could not prepare the program" : "Launch failed";
                 var details = request == null ? error.Message :
                     error.Message + Environment.NewLine + Environment.NewLine + CommandPreview(request);
-                LauncherDialogs.Message(this, details, "Download and launch");
+                LauncherDialogs.Message(this, details, RunDownloadLabel);
             }
             finally
             {
@@ -380,36 +371,6 @@ namespace CommanderX16
                 setBusy(false, null);
                 RefreshPreview();
             }
-        }
-
-        private bool RepairStartEmulator(string installedId, Emulator emulator, Profile options, string path, string root)
-        {
-            if (installedId == null) return false;
-            var installed = store.Data.Programs.FirstOrDefault(entry => entry.Id == installedId);
-            if (installed == null || store.Data.ConfiguredLaunchEmulator(installed) != null ||
-                store.Data.FindEmulator(emulator.Id) == null) return false;
-            bool repairAssignment = !store.Data.UsesStartDefaults(installed);
-            bool repairPath = !File.Exists(installed.Path);
-            if (!repairAssignment && !repairPath) return false;
-
-            store.Save(data =>
-            {
-                var entry = data.Programs.Single(item => item.Id == installedId);
-                if (repairAssignment)
-                {
-                    entry.EmulatorId = emulator.Id;
-                    entry.Options = Profile.Snapshot(options, emulator);
-                    entry.RequiresEmulatorSelection = false;
-                    entry.ProfileId = null;
-                }
-                if (repairPath)
-                {
-                    entry.Path = path;
-                    entry.SdKitRoot = root;
-                }
-            });
-            RefreshPrograms();
-            return true;
         }
     }
 }

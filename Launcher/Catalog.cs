@@ -96,6 +96,14 @@ namespace CommanderX16
             return candidates;
         }
 
+        internal static void DiscardExtraction(string directory)
+        {
+            if (directory == null || !Directory.Exists(directory)) return;
+            try { Directory.Delete(directory, true); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+
         internal static List<string> ExtractArchive(string archivePath, string directory, string prefix = "")
         {
             var root = Path.GetFullPath(directory) + Path.DirectorySeparatorChar;

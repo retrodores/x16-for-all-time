@@ -55,6 +55,15 @@ namespace CommanderX16
         internal static bool OfferBrowser(Form owner, string message, string title) =>
             ShowMessage(owner, message, title, "&Open in browser", "Close") == DialogResult.Yes;
 
+        internal static string PickProgram(Form owner)
+        {
+            using (var dialog = new OpenFileDialog
+            {
+                Filter = "Commander X16 programs (*.prg;*.bas;*.zip)|*.prg;*.bas;*.zip"
+            })
+                return dialog.ShowDialog(owner) == DialogResult.OK ? dialog.FileName : null;
+        }
+
         internal static int SelectItem(Form owner, string title, string[] items)
         {
             using (var dialog = new Form

@@ -2,15 +2,17 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CommanderX16
 {
     internal static class EmulatorProcess
     {
-        public static Task Start(Request request, IProgress<string> lateFailure = null) => Task.Run(() => StartAndCheck(request, lateFailure));
+        public static Task Start(Request request, IProgress<string> lateFailure = null, Action cleanup = null) =>
+            Task.Run(() => StartAndCheck(request, lateFailure, cleanup));
 
-        private static void StartAndCheck(Request request, IProgress<string> lateFailure)
+        private static void StartAndCheck(Request request, IProgress<string> lateFailure, Action cleanup)
         {
             var process = new Process
             {
@@ -59,7 +61,7 @@ namespace CommanderX16
                     throw new IOException("X16Emu exited during startup (code " + errorCode + ")." +
                         (message.Length == 0 ? "" : Environment.NewLine + message));
                 }
-                process.Exited += (sender, args) =>
+                void OnExit()
                 {
                     try
                     {
@@ -68,9 +70,27 @@ namespace CommanderX16
                         else if (process.ExitCode != 0)
                             lateFailure?.Report("Emulator exited with code " + process.ExitCode + ".");
                     }
-                    finally { process.Dispose(); }
-                };
-                process.EnableRaisingEvents = true;
+                    catch (InvalidOperationException) { } // The launcher window may already have closed.
+                    finally
+                    {
+                        process.Dispose();
+                        cleanup?.Invoke();
+                    }
+                }
+                if (cleanup == null)
+                {
+                    process.Exited += (sender, args) => OnExit();
+                    process.EnableRaisingEvents = true;
+                }
+                else
+                {
+                    // A foreground watcher cleans up the ZIP even after the launcher window closes.
+                    new Thread(() =>
+                    {
+                        process.WaitForExit();
+                        OnExit();
+                    }) { Name = "X16 program cleanup" }.Start();
+                }
                 monitorInBackground = true;
             }
             finally

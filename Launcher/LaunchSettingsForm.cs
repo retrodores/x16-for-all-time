@@ -83,7 +83,7 @@ namespace CommanderX16
                 prgPath.Text = program.Path ?? "";
                 startDefaults.Checked = settings.UsesStartDefaults(program);
                 AddRow(body, Pair("Program file", prgPath, Button("Browse…", PickProgram)));
-                Disposed += (sender, args) => DeleteImport(importedDirectory);
+                Disposed += (sender, args) => Catalog.DiscardExtraction(importedDirectory);
                 AddRow(body, Pair("Configuration", startDefaults));
             }
             AddRow(launchFields, Pair("Emulator", builds));
@@ -298,17 +298,8 @@ namespace CommanderX16
         private async void PickProgram()
         {
             if (importingProgram) return;
-            string path;
-            using (var dialog = new OpenFileDialog
-            {
-                Filter = "Commander X16 programs (*.prg;*.bas;*.zip)|*.prg;*.bas;*.zip"
-            })
-            {
-                if (dialog.ShowDialog(this) != DialogResult.OK) return;
-                path = dialog.FileName;
-            }
-
-            await SelectProgramFile(path);
+            string path = LauncherDialogs.PickProgram(this);
+            if (path != null) await SelectProgramFile(path);
         }
 
         private async Task SelectProgramFile(string path)
@@ -332,7 +323,7 @@ namespace CommanderX16
 
                 if (!IsImportedProgram(path))
                 {
-                    DeleteImport(importedDirectory);
+                    Catalog.DiscardExtraction(importedDirectory);
                     importedDirectory = extracted;
                     extracted = null;
                 }
@@ -345,7 +336,7 @@ namespace CommanderX16
             }
             finally
             {
-                DeleteImport(extracted);
+                Catalog.DiscardExtraction(extracted);
                 importingProgram = false;
                 if (!IsDisposed) UpdatePreview();
             }
@@ -359,14 +350,6 @@ namespace CommanderX16
         private bool IsImportedProgram(string path) =>
             importedDirectory != null &&
             path.StartsWith(importedDirectory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
-
-        private static void DeleteImport(string directory)
-        {
-            if (directory == null || !Directory.Exists(directory)) return;
-            try { Directory.Delete(directory, true); }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
-        }
 
         private void PickRom()
         {

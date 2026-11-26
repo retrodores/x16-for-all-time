@@ -38,6 +38,7 @@ namespace CommanderX16
         private string gifEntryId;
         private readonly Button browseGif = Button("Browse…");
         private readonly Button startDefaults = Button("Start defaults…");
+        private readonly Button runLocal = Button("Run a local program…");
         private readonly Label launchConfiguration = new Label { AutoSize = true };
         private readonly Button duplicate = Button("Duplicate entry…"),
             removeProgram = Button("Delete files…");
@@ -56,8 +57,16 @@ namespace CommanderX16
             AddRow(startBody, Pair("Find a program", search));
             search.AccessibleName = "Find a Start program";
             preview.AccessibleName = "Emulator command preview";
-            AddRow(startBody, Flow(Button("Add a local program…", () =>
-                EditLaunchSettings(new ProgramEntry(), "Add a local program", create: true)), browsePrograms, startDefaults));
+            var toolbar = Table();
+            toolbar.ColumnCount = 2;
+            toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            toolbar.Controls.Add(Flow(Button("Add a local program…", () =>
+                EditLaunchSettings(new ProgramEntry(), "Add a local program", create: true)), browsePrograms, startDefaults), 0, 0);
+            var launchActions = Flow(startSettings, runLocal);
+            launchActions.WrapContents = false;
+            toolbar.Controls.Add(launchActions, 1, 0);
+            AddRow(startBody, toolbar);
             browsePrograms.Click += (sender, args) => tabs.SelectedTab = catalogPage;
             startMenu.BackColor = SystemColors.Window;
             startMenu.ForeColor = SystemColors.WindowText;
@@ -71,7 +80,7 @@ namespace CommanderX16
             AddRow(startBody, Pair("GIF destination", gifFile, browseGif));
             AddRow(startBody, launchConfiguration);
             AddRow(startBody, preview, SizeType.Absolute, 83);
-            AddRow(startBody, Flow(startSettings, copy, launchActivity, launchStatus));
+            AddRow(startBody, Flow(copy, launchActivity, launchStatus));
 
             saveGif.CheckedChanged += (sender, args) => RefreshPreview();
             gifFile.TextChanged += (sender, args) => RefreshPreview();
@@ -94,6 +103,11 @@ namespace CommanderX16
                 if (index >= 0 && startMenu.GetSelected(index)) await RunSelected(SelectedProgram);
             };
             run.Click += async (sender, args) => await RunSelected(SelectedProgram);
+            runLocal.Click += async (sender, args) =>
+            {
+                var path = LauncherDialogs.PickProgram(this);
+                if (path != null) await RunLocalProgram(path);
+            };
             startDefaults.Click += (sender, args) => Attempt(EditStartDefaults);
             startSettings.Click += (sender, args) => Attempt(() => EditLaunchSettings(SelectedProgram));
             copy.Click += (sender, args) => Attempt(CopyPreview);
@@ -122,7 +136,8 @@ namespace CommanderX16
             var unlink = new ToolStripMenuItem("Remove from Start", null, (sender, args) => Attempt(RemoveStartEntries));
             var delete = new ToolStripMenuItem("Delete programs from disk…", null, (sender, args) => removeProgram.PerformClick());
             var items = actions.Select(button =>
-                new ToolStripMenuItem(button.Text, null, (sender, args) => button.PerformClick())).ToArray();
+                new ToolStripMenuItem(button == startSettings ? "Edit" : button.Text, null,
+                    (sender, args) => button.PerformClick())).ToArray();
             contextMenu.Items.AddRange(items);
             contextMenu.Items.AddRange(new ToolStripItem[] { new ToolStripSeparator(), moveUp, moveDown, moveTop, moveBottom, new ToolStripSeparator(), info, openPrevious, revert, unlink, delete });
             contextMenu.Opening += (sender, args) =>
@@ -140,7 +155,7 @@ namespace CommanderX16
                 unlink.Enabled = delete.Enabled = removeProgram.Enabled;
                 for (int i = 0; i < actions.Length; i++)
                 {
-                    items[i].Text = actions[i].Text;
+                    if (actions[i] == run) items[i].Text = run.Text;
                     items[i].Enabled = actions[i].Enabled;
                 }
             };
@@ -585,7 +600,7 @@ namespace CommanderX16
             run.Text = (options?.AutoRun == true ? "Run " : "Load ") + programType;
             saveGif.Enabled = !launching && program != null;
             gifFile.Enabled = browseGif.Enabled = saveGif.Enabled && saveGif.Checked;
-            startDefaults.Enabled = !launching && store.Data.Emulators.Count != 0;
+            startDefaults.Enabled = runLocal.Enabled = !launching && store.Data.Emulators.Count != 0;
             launchConfiguration.Text = emulator == null ? "Command preview" :
                 (program.EmulatorId == emulator.Id ? "PRG settings" : "Start defaults") + " · " + emulator.Name;
             startSettings.Enabled = duplicate.Enabled = !launching && program != null;
@@ -660,7 +675,59 @@ namespace CommanderX16
             }
         }
 
-        private async Task StartPreparedProgram(Request request, Action<string> report)
+        private async Task RunLocalProgram(string path)
+        {
+            if (launching) return;
+            string extraction = null;
+            Request request = null;
+            try
+            {
+                var emulator = store.Data.ResolveLaunch(null, out var source);
+                if (emulator == null) throw new InvalidOperationException(MissingLaunchSetup());
+                var options = Profile.CopyOptions(source, emulator);
+                options.AutoRun = true;
+                launching = true;
+                RefreshPreview();
+                launchActivity.Show();
+                if (string.Equals(Path.GetExtension(path), ".zip", StringComparison.OrdinalIgnoreCase))
+                {
+                    launchStatus.Text = "Extracting ZIP…";
+                    var directory = extraction = Path.Combine(Path.GetTempPath(), "X16ForAllTime-" + Guid.NewGuid().ToString("N"));
+                    string[] candidates = await Task.Run(() => Catalog.ExtractCandidates(path, directory, null, includeBasic: true));
+                    int selected = candidates.Length == 1 ? 0 :
+                        LauncherDialogs.SelectItem(this, "Choose the startup program", candidates);
+                    if (selected < 0)
+                    {
+                        launchStatus.Text = "Launch canceled";
+                        return;
+                    }
+                    path = Path.Combine(directory, candidates[selected]);
+                }
+
+                request = Launch.Prepare(emulator, options, path, true);
+                launchStatus.Text = "Starting emulator…";
+                string launchedDirectory = extraction;
+                Action cleanup = launchedDirectory == null ? (Action)null : () => Catalog.DiscardExtraction(launchedDirectory);
+                await StartPreparedProgram(request, message => launchStatus.Text = message, cleanup);
+                extraction = null; // The process monitor now owns the ZIP's temporary files.
+            }
+            catch (Exception error)
+            {
+                launchActivity.Hide();
+                launchStatus.Text = "Launch failed";
+                string details = error.Message + (request == null ? "" : Environment.NewLine + Environment.NewLine + CommandPreview(request));
+                LauncherDialogs.Message(this, details, "Run a local program");
+            }
+            finally
+            {
+                Catalog.DiscardExtraction(extraction);
+                launching = false;
+                launchActivity.Hide();
+                RefreshPreview();
+            }
+        }
+
+        private async Task StartPreparedProgram(Request request, Action<string> report, Action cleanup = null)
         {
             int attempt = ++launchAttempt;
             string lateError = null;
@@ -668,7 +735,7 @@ namespace CommanderX16
             {
                 lateError = message;
                 if (attempt == launchAttempt && !IsDisposed) report(message);
-            }));
+            }), cleanup);
             if (lateError == null) report("Emulator launched");
         }
     }
