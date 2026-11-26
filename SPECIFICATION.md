@@ -1,6 +1,6 @@
 # X16 For All Time port specification
 
-This document describes the launcher behavior and X16 Files interface implemented by the Windows beta. It is intended for developers building a native Linux or macOS launcher. The Windows implementation is the reference. A port can choose its own UI, packaging, and settings format.
+This document describes the launcher behavior and X16 Files interface implemented by X16 For All Time 1.0 for Windows. It is intended for developers building a native Linux or macOS launcher. The Windows implementation is the reference. A port can choose its own UI, packaging, and settings format.
 
 ## Launcher behavior
 

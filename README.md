@@ -2,6 +2,8 @@
 
 A Windows launcher for running a library of Commander X16 programs with your choice of X16Emu build.
 
+[Download the Windows installer](https://github.com/retrodores/x16-for-all-time/releases/latest)
+
 ## Start
 
 Drag a program above or below another program to reorder Start. The right-click menu also offers **Move up**, **Move down**, **Send to top**, and **Send to bottom**. F.A.T. saves the order across restarts. Start names are unique. Add a version or another detail when renaming or adding a program with a name already in use.
