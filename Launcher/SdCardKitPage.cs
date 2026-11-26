@@ -49,8 +49,9 @@ namespace CommanderX16
             launchKitItem.Click += async (sender, args) =>
             {
                 var item = kitTree.SelectedNode?.Tag as KitItem;
-                if (!loadingKit && !launching && item?.CanInstall == true)
-                    await LaunchFromBrowser(progress => GetKitProgram(item), SetKitBusy, kitStatus);
+                if (loadingKit || launching || item?.CanInstall != true) return;
+                var installedId = store.Data.Programs.FirstOrDefault(entry => entry.SdKitSource == item.Path)?.Id;
+                await LaunchFromBrowser(progress => GetKitProgram(item), SetKitBusy, kitStatus, installedId);
             };
             kitTree.NodeMouseDoubleClick += (sender, args) =>
             {

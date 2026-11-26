@@ -284,18 +284,19 @@ namespace CommanderX16
         {
             var program = catalogTree.SelectedNode?.Tag as CatalogProgram;
             if (catalogBusy || launching || (program?.Downloads.Length ?? 0) == 0) return;
+            var installedId = store.Data.Programs.FirstOrDefault(entry => entry.CatalogId == program.Id)?.Id;
             await LaunchFromBrowser(async progress =>
             {
                 var package = SelectCatalogDownload(program);
                 if (package == null) return (null, null);
                 var path = await Catalog.Download(program, package, progress, SelectCatalogPrg);
                 return (path, null);
-            }, SetCatalogBusy, catalogStatus);
+            }, SetCatalogBusy, catalogStatus, installedId);
         }
 
         private async Task LaunchFromBrowser(
             Func<IProgress<string>, Task<(string Path, string Root)>> getProgram,
-            Action<bool, string> setBusy, Label status)
+            Action<bool, string> setBusy, Label status, string installedId)
         {
             var emulator = store.Data.FindEmulator(store.Data.StartEmulatorId);
             var source = emulator == null ? null : store.Data.StartOptions;
@@ -328,6 +329,16 @@ namespace CommanderX16
                 request = Launch.Prepare(emulator, options, program.Path, true, program.Root);
                 status.Text = "Starting emulator…";
                 await StartPreparedProgram(request, message => status.Text = message);
+                try
+                {
+                    if (RepairStartEmulator(installedId, emulator, options, program.Path, program.Root))
+                        status.Text = "Emulator launched. The Start entry now uses this emulator.";
+                }
+                catch (Exception error)
+                {
+                    status.Text = "Emulator launched. Could not update the Start entry.";
+                    LauncherDialogs.Message(this, error.Message, "Update Start entry");
+                }
             }
             catch (DownloadForbiddenException error)
             {
@@ -346,6 +357,30 @@ namespace CommanderX16
                 setBusy(false, null);
                 RefreshPreview();
             }
+        }
+
+        private bool RepairStartEmulator(string installedId, Emulator emulator, Profile options, string path, string root)
+        {
+            if (installedId == null) return false;
+            var installed = store.Data.Programs.FirstOrDefault(entry => entry.Id == installedId);
+            if (installed == null || store.Data.LaunchEmulator(installed) != null ||
+                store.Data.FindEmulator(emulator.Id) == null) return false;
+
+            store.Save(data =>
+            {
+                var entry = data.Programs.Single(item => item.Id == installedId);
+                entry.EmulatorId = emulator.Id;
+                entry.Options = Profile.Snapshot(options, emulator);
+                entry.RequiresEmulatorSelection = false;
+                entry.ProfileId = null;
+                if (!File.Exists(entry.Path))
+                {
+                    entry.Path = path;
+                    entry.SdKitRoot = root;
+                }
+            });
+            RefreshPrograms();
+            return true;
         }
     }
 }
