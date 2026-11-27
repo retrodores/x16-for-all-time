@@ -37,12 +37,7 @@ namespace CommanderX16
             return this;
         }
 
-        public RunHistoryEntry ForReplay()
-        {
-            var replay = (RunHistoryEntry)MemberwiseClone();
-            replay.Mode = "History";
-            return replay;
-        }
+        public RunHistoryEntry Copy() => (RunHistoryEntry)MemberwiseClone();
 
         public static string RelativeEntry(string root, string path)
         {
@@ -143,7 +138,7 @@ namespace CommanderX16
         private async Task ReplayHistory(RunHistoryEntry entry)
         {
             if (launching || entry == null) return;
-            var replay = entry.ForReplay();
+            var replay = entry.Copy();
             string extraction = null;
             launching = true;
             RefreshPreview();
@@ -184,7 +179,7 @@ namespace CommanderX16
                 historyStatus.Text = "Starting emulator…";
                 string launchedDirectory = extraction;
                 Action cleanup = launchedDirectory == null ? (Action)null : () => Catalog.DiscardExtraction(launchedDirectory);
-                await StartPreparedProgram(request, message => historyStatus.Text = message, cleanup, replay);
+                await StartPreparedProgram(request, message => historyStatus.Text = message, cleanup);
                 extraction = null;
             }
             catch (DownloadForbiddenException error)
