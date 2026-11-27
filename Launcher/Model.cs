@@ -33,6 +33,8 @@ namespace CommanderX16
         [DataMember] public bool BuildDefaultsMigrated = true;
         [DataMember] public string StartEmulatorId;
         [DataMember] public Profile StartOptions;
+        [DataMember(EmitDefaultValue = false)] public string RunOnceEmulatorId;
+        [DataMember(EmitDefaultValue = false)] public Profile RunOnceOptions;
 
         public Emulator FindEmulator(string id) => id == null ? null : Emulators.FirstOrDefault(emulator => emulator.Id == id);
 
@@ -531,6 +533,7 @@ namespace CommanderX16
                     emulator.Extra = UpdateArguments(emulator.Extra);
                 }
                 UpdateProfile(settings.StartOptions);
+                UpdateProfile(settings.RunOnceOptions);
                 foreach (var profile in settings.Profiles) UpdateProfile(profile);
                 foreach (var program in settings.Programs)
                 {

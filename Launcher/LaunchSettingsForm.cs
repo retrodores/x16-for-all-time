@@ -21,6 +21,7 @@ namespace CommanderX16
         private readonly Profile savedOptions;
         private readonly bool editingStartDefaults;
         private readonly string runOncePath;
+        private readonly bool recalledRunOnce;
         private readonly ComboBox builds = Combo(), profiles = ProfileCombo();
         private readonly ComboBox cpu = OptionsFor(HardwareOptions.Cpu, HardwareOptions.CpuName);
         private readonly ComboBox mhz = OptionsFor(HardwareOptions.Clock,
@@ -54,7 +55,7 @@ namespace CommanderX16
 
         public LaunchSettingsForm(Settings settings, string title, Emulator selected, Profile savedOptions,
             ProgramEntry program = null, string profileName = null, string profileId = null, string clearAction = null,
-            string runOncePath = null)
+            string runOncePath = null, bool recalledRunOnce = false)
         {
             this.settings = settings;
             this.program = program;
@@ -62,6 +63,7 @@ namespace CommanderX16
             initialEmulator = selected;
             bool fixedBuild = profileName != null;
             this.runOncePath = runOncePath;
+            this.recalledRunOnce = recalledRunOnce;
             editingStartDefaults = program == null && !fixedBuild && runOncePath == null;
             this.savedOptions = savedOptions;
             preserveUnassignedOptions = program != null && selected == null && savedOptions != null;
@@ -178,7 +180,7 @@ namespace CommanderX16
         }
 
         private bool HasSavedSettings => savedOptions != null && Emulator?.Id == initialEmulator?.Id;
-        private string SavedSettingsLabel => runOncePath != null ? "Start launch settings" :
+        private string SavedSettingsLabel => runOncePath != null ? (recalledRunOnce ? "Last Run once settings" : "Start launch settings") :
             editingStartDefaults ? "Saved Start settings" : "Saved settings";
         private string BuiltInSettingsLabel => editingStartDefaults ? "Built-in emulator defaults" : "Emulator defaults";
 

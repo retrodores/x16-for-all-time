@@ -682,7 +682,10 @@ namespace CommanderX16
             Request request = null;
             try
             {
-                var emulator = store.Data.ResolveLaunch(null, out var source);
+                var emulator = store.Data.FindEmulator(store.Data.RunOnceEmulatorId);
+                var source = store.Data.RunOnceOptions;
+                bool recalled = source != null && File.Exists(emulator?.Exe);
+                if (!recalled) emulator = store.Data.ResolveLaunch(null, out source);
                 if (emulator == null) throw new InvalidOperationException(MissingLaunchSetup());
                 launching = true;
                 RefreshPreview();
@@ -702,20 +705,37 @@ namespace CommanderX16
                     path = Path.Combine(directory, candidates[selected]);
                 }
 
-                using (var dialog = new LaunchSettingsForm(store.Data, "Run once", emulator, source, runOncePath: path))
+                Profile runOptions;
+                using (var dialog = new LaunchSettingsForm(store.Data, "Run once", emulator, source,
+                    runOncePath: path, recalledRunOnce: recalled))
                 {
                     if (LauncherDialogs.Show(dialog, this) != DialogResult.OK)
                     {
                         launchStatus.Text = "Launch canceled";
                         return;
                     }
-                    request = Launch.Prepare(dialog.Emulator, dialog.Options, path, true);
+                    emulator = dialog.Emulator;
+                    runOptions = Profile.Snapshot(dialog.Options, emulator);
+                    request = Launch.Prepare(emulator, runOptions, path, true);
                 }
                 launchStatus.Text = "Starting emulator…";
                 string launchedDirectory = extraction;
                 Action cleanup = launchedDirectory == null ? (Action)null : () => Catalog.DiscardExtraction(launchedDirectory);
                 await StartPreparedProgram(request, message => launchStatus.Text = message, cleanup);
                 extraction = null; // The process monitor now owns the ZIP's temporary files.
+                try
+                {
+                    store.Save(settings =>
+                    {
+                        settings.RunOnceEmulatorId = emulator.Id;
+                        settings.RunOnceOptions = runOptions;
+                    });
+                }
+                catch (Exception error)
+                {
+                    launchStatus.Text = "Emulator launched. Could not remember the Run once settings.";
+                    LauncherDialogs.Message(this, error.Message, "Run once settings");
+                }
             }
             catch (Exception error)
             {

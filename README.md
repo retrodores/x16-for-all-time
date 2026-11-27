@@ -10,7 +10,7 @@ Drag a program above or below another program to reorder Start. The right-click 
 
 Choose **Browse X16 Files** to find a program or **Add a local program** to use one you have. On first run, the launcher opens **Emulators** and prompts you to install X16Emu or register an existing copy. Registering the first emulator unlocks **Start**, **X16 Files**, and **SD Card Kit**.
 
-**Run once…** opens a PRG, BAS, or ZIP without adding a Start entry. The launch dialog starts with Start defaults and lets you pick another emulator, prefill from a profile, or adjust settings for that session. Loose programs run in their original folder. ZIPs keep their companion files for the emulator session and are cleaned up when it exits.
+**Run once…** opens a PRG, BAS, or ZIP without adding a Start entry. The launch dialog remembers the emulator and settings from your last successful Run once launch, including after updates. It uses Start defaults when there are no remembered settings or the remembered emulator is unavailable. You can pick another emulator, prefill from a profile, or adjust the settings before running. Loose programs run in their original folder. ZIPs keep their companion files for the emulator session and are cleaned up when it exits.
 
 Double-click an entry or select **Run** to launch it. The entry's saved configuration takes priority. **Start defaults** supplies an emulator and settings for entries without a configuration. The preview identifies the settings in use and **Copy PowerShell** copies the same command. The working directory is always the PRG's containing folder.
 
