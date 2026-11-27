@@ -689,11 +689,7 @@ namespace CommanderX16
                     string.Equals(extension, ".gi", StringComparison.OrdinalIgnoreCase)))
                     throw new InvalidOperationException("Choose a .gif or .gi output path without commas.");
                 if (validate)
-                {
                     CheckPath(Path.GetDirectoryName(path), "GIF output folder", true);
-                    if (File.Exists(path))
-                        throw new IOException("A GIF already exists at " + path + ". Choose a different output file.");
-                }
                 Add(args, "-gif", path);
             }
             string[] duplicates = args.Where(arg => arg.StartsWith("-", StringComparison.Ordinal))

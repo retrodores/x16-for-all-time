@@ -372,7 +372,8 @@ namespace CommanderX16
             using (var dialog = new SaveFileDialog
             {
                 Filter = "GIF recording (*.gif)|*.gif", DefaultExt = "gif",
-                InitialDirectory = program?.Path == null ? "" : Path.GetDirectoryName(program.Path)
+                InitialDirectory = Path.GetDirectoryName(runOncePath ?? program?.Path) ?? "",
+                OverwritePrompt = false
             })
                 if (dialog.ShowDialog(this) == DialogResult.OK) gif.Text = dialog.FileName;
         }

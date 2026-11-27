@@ -26,7 +26,7 @@ namespace CommanderX16
         private const string StartDragFormat = "X16ForAllTime.StartProgram";
         private ProgramEntry SelectedProgram => startMenu.SelectedItems.Count == 1
             ? (ProgramEntry)startMenu.SelectedItem : null;
-        private readonly Button startSettings = Button("Launch settings…");
+        private readonly Button editProgram = Button("Edit program…");
         private readonly ProgressBar launchActivity = new ProgressBar
         {
             Size = new Size(86, 16), Margin = new Padding(4, 7, 4, 0), Style = ProgressBarStyle.Marquee,
@@ -63,9 +63,7 @@ namespace CommanderX16
             toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             toolbar.Controls.Add(Flow(Button("Add a local program…", () =>
                 EditLaunchSettings(new ProgramEntry(), "Add a local program", create: true)), browsePrograms, startDefaults), 0, 0);
-            var launchActions = Flow(startSettings, runLocal);
-            launchActions.WrapContents = false;
-            toolbar.Controls.Add(launchActions, 1, 0);
+            toolbar.Controls.Add(Flow(runLocal), 1, 0);
             AddRow(startBody, toolbar);
             browsePrograms.Click += (sender, args) => tabs.SelectedTab = catalogPage;
             startMenu.BackColor = SystemColors.Window;
@@ -73,7 +71,7 @@ namespace CommanderX16
             startMenu.Font = new Font("Segoe UI", 13);
             AddRow(startBody, startMenu, SizeType.Percent, 100);
             AddRow(startBody, selectionStatus);
-            AddRow(startBody, Flow(run, duplicate, removeProgram));
+            AddRow(startBody, Flow(run, editProgram, duplicate, removeProgram));
             gifFile.AccessibleName = "GIF output file";
             AddRow(startBody, Pair("", saveGif));
             browseGif.AccessibleName = "Browse for GIF output file";
@@ -109,7 +107,7 @@ namespace CommanderX16
                 if (path != null) await RunLocalProgram(path);
             };
             startDefaults.Click += (sender, args) => Attempt(EditStartDefaults);
-            startSettings.Click += (sender, args) => Attempt(() => EditLaunchSettings(SelectedProgram));
+            editProgram.Click += (sender, args) => Attempt(() => EditLaunchSettings(SelectedProgram));
             copy.Click += (sender, args) => Attempt(CopyPreview);
             removeProgram.Click += (sender, args) => Attempt(RemoveProgram);
             duplicate.Click += (sender, args) => Attempt(DuplicateProgram);
@@ -122,7 +120,7 @@ namespace CommanderX16
         private void BuildStartContextMenu()
         {
             var contextMenu = new ContextMenuStrip();
-            var actions = new[] { run, startSettings, copy, duplicate };
+            var actions = new[] { run, editProgram, copy, duplicate };
             var info = new ToolStripMenuItem("Program information…", null, (sender, args) => Attempt(ShowProgramInformation));
             var openPrevious = new ToolStripMenuItem("Open previous folder", null, (sender, args) =>
                 Attempt(() => Process.Start(new ProcessStartInfo(Path.GetDirectoryName(SelectedProgram.PreviousInstall.Path)) { UseShellExecute = true })));
@@ -136,7 +134,7 @@ namespace CommanderX16
             var unlink = new ToolStripMenuItem("Remove from Start", null, (sender, args) => Attempt(RemoveStartEntries));
             var delete = new ToolStripMenuItem("Delete programs from disk…", null, (sender, args) => removeProgram.PerformClick());
             var items = actions.Select(button =>
-                new ToolStripMenuItem(button == startSettings ? "Edit" : button.Text, null,
+                new ToolStripMenuItem(button == editProgram ? "Edit" : button.Text, null,
                     (sender, args) => button.PerformClick())).ToArray();
             contextMenu.Items.AddRange(items);
             contextMenu.Items.AddRange(new ToolStripItem[] { new ToolStripSeparator(), moveUp, moveDown, moveTop, moveBottom, new ToolStripSeparator(), info, openPrevious, revert, unlink, delete });
@@ -451,7 +449,7 @@ namespace CommanderX16
             EditLaunchSettings(entry, "Duplicate PRG entry", create: true);
         }
 
-        private void EditLaunchSettings(ProgramEntry program, string title = "Launch settings", bool create = false)
+        private void EditLaunchSettings(ProgramEntry program, string title = "Edit program", bool create = false)
         {
             if (program == null) return;
             Profile initial = program.Options;
@@ -603,7 +601,7 @@ namespace CommanderX16
             startDefaults.Enabled = runLocal.Enabled = !launching && store.Data.Emulators.Count != 0;
             launchConfiguration.Text = emulator == null ? "Command preview" :
                 (program.EmulatorId == emulator.Id ? "PRG settings" : "Start defaults") + " · " + emulator.Name;
-            startSettings.Enabled = duplicate.Enabled = !launching && program != null;
+            editProgram.Enabled = duplicate.Enabled = !launching && program != null;
             removeProgram.Enabled = !launching && startMenu.SelectedItems.Count > 0;
             copy.Enabled = false;
             if (startMenu.SelectedItems.Count > 1) preview.Text = startMenu.SelectedItems.Count + " programs selected.";

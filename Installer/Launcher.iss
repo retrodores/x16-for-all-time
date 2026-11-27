@@ -1,5 +1,5 @@
 #define AppName "X16 For All Time"
-#define AppVersion "1.0.0"
+#define AppVersion "1.0.4"
 #define BinDir "..\Launcher\bin\Release"
 
 [Setup]
@@ -17,7 +17,7 @@ PrivilegesRequired=lowest
 MinVersion=10.0
 CloseApplications=yes
 OutputDir=..\dist
-OutputBaseFilename=X16ForAllTime-Setup
+OutputBaseFilename=X16ForAllTime-{#AppVersion}-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
