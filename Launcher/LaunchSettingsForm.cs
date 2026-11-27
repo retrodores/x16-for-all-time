@@ -233,7 +233,11 @@ namespace CommanderX16
                 return (snapshot.Cpu, snapshot.Mhz, snapshot.Ram, snapshot.Scale, runOncePath != null || snapshot.AutoRun, snapshot.Fullscreen,
                     snapshot.Gif?.Trim() ?? "", snapshot.Rom.Trim(), snapshot.SdCard?.Trim() ?? "",
                     snapshot.FsRoot?.Trim() ?? "", arguments, serial, address);
-            }).ToArray();
+            })
+                .OrderBy(group => group.Key.Cpu == "-c02" ? 0 : group.Key.Cpu == "-c816" ? 1 : 2)
+                .ThenByDescending(group => int.TryParse(group.Key.Mhz, out int mhz) ? mhz : 0)
+                .ThenByDescending(group => int.TryParse(group.Key.Ram, out int ram) ? ram : 0)
+                .ToArray();
 
             loading = true;
             profiles.Items.Clear();
@@ -246,7 +250,8 @@ namespace CommanderX16
                     label = $"{choice.Label} ({number})";
                 profiles.Items.Add(new ProfileChoice(label, choice.Source));
             }
-            profiles.SelectedIndex = preferDefault ? Array.FindIndex(groups, group => group.Contains(defaultChoice)) : 0;
+            var initialChoice = preferDefault ? defaultChoice : choices[0];
+            profiles.SelectedIndex = Array.FindIndex(groups, group => group.Contains(initialChoice));
             profiles.Enabled = emulator != null;
             hardware.Enabled = hardwareOutput.Enabled = emulator?.UpstreamOptions ?? (program != null);
             loading = false;
