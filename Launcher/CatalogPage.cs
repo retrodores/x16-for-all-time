@@ -328,15 +328,12 @@ namespace CommanderX16
             Action<bool, string> setBusy, Label status, string installedId)
         {
             var installed = store.Data.Programs.FirstOrDefault(entry => entry.Id == installedId);
-            var emulator = store.Data.ResolveLaunch(installed, out var source);
-            if (emulator == null)
+            if (store.Data.ResolveLaunch(installed, out _) == null)
             {
                 LauncherDialogs.Message(this, MissingLaunchSetup(), RunDownloadLabel);
                 return;
             }
 
-            var options = Profile.CopyOptions(source, emulator);
-            options.AutoRun = true;
             launching = true;
             RefreshPreview();
             setBusy(true, "Preparing download…");
@@ -350,9 +347,15 @@ namespace CommanderX16
                     return;
                 }
 
-                request = Launch.Prepare(emulator, options, program.Path, true, program.Root);
+                request = PrepareRunOnce(program.Path, installed, out var emulator, out var options, kitRoot: program.Root);
+                if (request == null)
+                {
+                    status.Text = "Launch canceled";
+                    return;
+                }
                 status.Text = "Starting emulator…";
                 await StartPreparedProgram(request, message => status.Text = message);
+                RememberRunOnce(emulator, options, status);
             }
             catch (DownloadForbiddenException error)
             {

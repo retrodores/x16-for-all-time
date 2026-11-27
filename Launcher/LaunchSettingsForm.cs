@@ -22,6 +22,7 @@ namespace CommanderX16
         private readonly bool editingStartDefaults;
         private readonly string runOncePath;
         private readonly string gifDirectory;
+        private readonly string runOnceKitRoot;
         private readonly bool recalledRunOnce;
         private readonly ComboBox builds = Combo(), profiles = ProfileCombo();
         private readonly ComboBox cpu = OptionsFor(HardwareOptions.Cpu, HardwareOptions.CpuName);
@@ -56,7 +57,7 @@ namespace CommanderX16
 
         public LaunchSettingsForm(Settings settings, string title, Emulator selected, Profile savedOptions,
             ProgramEntry program = null, string profileName = null, string profileId = null, string clearAction = null,
-            string runOncePath = null, bool recalledRunOnce = false, string gifDirectory = null)
+            string runOncePath = null, bool recalledRunOnce = false, string gifDirectory = null, string runOnceKitRoot = null)
         {
             this.settings = settings;
             this.program = program;
@@ -65,6 +66,7 @@ namespace CommanderX16
             bool fixedBuild = profileName != null;
             this.runOncePath = runOncePath;
             this.gifDirectory = gifDirectory;
+            this.runOnceKitRoot = runOnceKitRoot;
             this.recalledRunOnce = recalledRunOnce;
             editingStartDefaults = program == null && !fixedBuild && runOncePath == null;
             this.savedOptions = savedOptions;
@@ -419,7 +421,7 @@ namespace CommanderX16
             {
                 ReadOptions();
                 if (runOncePath != null)
-                    preview.Text = CommandPreview(Launch.Prepare(Emulator, options, runOncePath, false, gifDirectory: gifDirectory));
+                    preview.Text = CommandPreview(Launch.Prepare(Emulator, options, runOncePath, false, runOnceKitRoot, gifDirectory));
                 else if (program != null)
                 {
                     if (string.IsNullOrWhiteSpace(prgPath.Text) ||

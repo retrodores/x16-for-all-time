@@ -100,6 +100,12 @@ namespace CommanderX16
                 int index = startMenu.IndexFromPoint(args.Location);
                 if (index >= 0 && startMenu.GetSelected(index)) await RunSelected(SelectedProgram);
             };
+            startMenu.KeyDown += (sender, args) =>
+            {
+                if (args.KeyData != Keys.Delete) return;
+                args.SuppressKeyPress = true;
+                removeProgram.PerformClick();
+            };
             run.Click += async (sender, args) => await RunSelected(SelectedProgram);
             runLocal.Click += async (sender, args) =>
             {
@@ -681,11 +687,6 @@ namespace CommanderX16
             Request request = null;
             try
             {
-                var emulator = store.Data.FindEmulator(store.Data.RunOnceEmulatorId);
-                var source = store.Data.RunOnceOptions;
-                bool recalled = source != null && File.Exists(emulator?.Exe);
-                if (!recalled) emulator = store.Data.ResolveLaunch(null, out source);
-                if (emulator == null) throw new InvalidOperationException(MissingLaunchSetup());
                 launching = true;
                 RefreshPreview();
                 launchActivity.Show();
@@ -705,37 +706,18 @@ namespace CommanderX16
                     path = Path.Combine(directory, candidates[selected]);
                 }
 
-                Profile runOptions;
-                using (var dialog = new LaunchSettingsForm(store.Data, "Run once", emulator, source,
-                    runOncePath: path, recalledRunOnce: recalled, gifDirectory: gifDirectory))
+                request = PrepareRunOnce(path, null, out var emulator, out var runOptions, gifDirectory: gifDirectory);
+                if (request == null)
                 {
-                    if (LauncherDialogs.Show(dialog, this) != DialogResult.OK)
-                    {
-                        launchStatus.Text = "Launch canceled";
-                        return;
-                    }
-                    emulator = dialog.Emulator;
-                    runOptions = Profile.Snapshot(dialog.Options, emulator);
-                    request = Launch.Prepare(emulator, runOptions, path, true, gifDirectory: gifDirectory);
+                    launchStatus.Text = "Launch canceled";
+                    return;
                 }
                 launchStatus.Text = "Starting emulator…";
                 string launchedDirectory = extraction;
                 Action cleanup = launchedDirectory == null ? (Action)null : () => Catalog.DiscardExtraction(launchedDirectory);
                 await StartPreparedProgram(request, message => launchStatus.Text = message, cleanup);
                 extraction = null; // The process monitor now owns the ZIP's temporary files.
-                try
-                {
-                    store.Save(settings =>
-                    {
-                        settings.RunOnceEmulatorId = emulator.Id;
-                        settings.RunOnceOptions = runOptions;
-                    });
-                }
-                catch (Exception error)
-                {
-                    launchStatus.Text = "Emulator launched. Could not remember the Run once settings.";
-                    LauncherDialogs.Message(this, error.Message, "Run once settings");
-                }
+                RememberRunOnce(emulator, runOptions, launchStatus);
             }
             catch (Exception error)
             {
@@ -750,6 +732,42 @@ namespace CommanderX16
                 launching = false;
                 launchActivity.Hide();
                 RefreshPreview();
+            }
+        }
+
+        private Request PrepareRunOnce(string path, ProgramEntry installed, out Emulator emulator, out Profile options,
+            string kitRoot = null, string gifDirectory = null)
+        {
+            emulator = store.Data.FindEmulator(store.Data.RunOnceEmulatorId);
+            options = store.Data.RunOnceOptions;
+            bool recalled = options != null && File.Exists(emulator?.Exe);
+            if (!recalled) emulator = store.Data.ResolveLaunch(installed, out options);
+            if (emulator == null) throw new InvalidOperationException(MissingLaunchSetup());
+
+            using (var dialog = new LaunchSettingsForm(store.Data, "Run once", emulator, options,
+                runOncePath: path, recalledRunOnce: recalled, gifDirectory: gifDirectory, runOnceKitRoot: kitRoot))
+            {
+                if (LauncherDialogs.Show(dialog, this) != DialogResult.OK) return null;
+                emulator = dialog.Emulator;
+                options = Profile.Snapshot(dialog.Options, emulator);
+                return Launch.Prepare(emulator, options, path, true, kitRoot, gifDirectory);
+            }
+        }
+
+        private void RememberRunOnce(Emulator emulator, Profile options, Label status)
+        {
+            try
+            {
+                store.Save(settings =>
+                {
+                    settings.RunOnceEmulatorId = emulator.Id;
+                    settings.RunOnceOptions = options;
+                });
+            }
+            catch (Exception error)
+            {
+                status.Text = "Emulator launched. Could not remember the Run once settings.";
+                LauncherDialogs.Message(this, error.Message, "Run once settings");
             }
         }
 
