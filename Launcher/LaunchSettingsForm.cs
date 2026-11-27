@@ -234,7 +234,8 @@ namespace CommanderX16
                     snapshot.Gif?.Trim() ?? "", snapshot.Rom.Trim(), snapshot.SdCard?.Trim() ?? "",
                     snapshot.FsRoot?.Trim() ?? "", arguments, serial, address);
             })
-                .OrderBy(group => group.Key.Cpu == "-c02" ? 0 : group.Key.Cpu == "-c816" ? 1 : 2)
+                .OrderByDescending(group => group.Contains(defaultChoice))
+                .ThenBy(group => group.Key.Cpu == "-c02" ? 0 : group.Key.Cpu == "-c816" ? 1 : 2)
                 .ThenByDescending(group => int.TryParse(group.Key.Mhz, out int mhz) ? mhz : 0)
                 .ThenByDescending(group => int.TryParse(group.Key.Ram, out int ram) ? ram : 0)
                 .ToArray();
@@ -244,7 +245,7 @@ namespace CommanderX16
             var labels = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
             foreach (var group in groups)
             {
-                var choice = group.First();
+                var choice = group.Contains(defaultChoice) ? defaultChoice : group.First();
                 string label = choice.Label;
                 for (int number = 2; !labels.Add(label); number++)
                     label = $"{choice.Label} ({number})";
