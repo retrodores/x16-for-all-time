@@ -23,7 +23,7 @@ namespace CommanderX16
         private readonly ProgressBar kitActivity = BrowserActivity();
         private readonly Button refreshKit = Button("Refresh from SD Card Kit");
         private readonly Button openKit = Button("Open project page");
-        private readonly Button installKitItem = Button("Install to Start");
+        private readonly Button installKitItem = Button("Install to Favorites");
         private readonly Button launchKitItem = Button(RunDownloadLabel);
         private KitItem[] kitItems;
         private string kitRevision;
@@ -58,7 +58,7 @@ namespace CommanderX16
             {
                 if (args.Button != MouseButtons.Left || !(args.Node.Tag is KitItem item) || !item.CanInstall) return;
                 kitTree.SelectedNode = args.Node;
-                installKitItem.PerformClick();
+                launchKitItem.PerformClick();
             };
             UpdateKitSelection();
             tabs.SelectedIndexChanged += async (sender, args) =>
@@ -143,7 +143,7 @@ namespace CommanderX16
             installKitItem.Enabled = launchKitItem.Enabled = !loadingKit && !launching && supported;
             installKitItem.Visible = launchKitItem.Visible = supported;
             installKitItem.Text = supported && store.Data.Programs.Any(entry => entry.SdKitSource == item.Path)
-                ? "Reinstall to Start" : "Install to Start";
+                ? "Reinstall to Favorites" : "Install to Favorites";
             if (kitItems != null)
                 kitDetails.Text = supported ? kitTree.SelectedNode.Text + Environment.NewLine +
                     item.Path.Substring(KitRoot.Length + 1) :
@@ -165,7 +165,7 @@ namespace CommanderX16
                     return null;
                 }
                 if (item.IsZip) extracted = root;
-                kitStatus.Text = "Adding program to Start…";
+                kitStatus.Text = "Adding program to Favorites…";
                 string id = null;
                 store.Save(data =>
                 {
@@ -194,7 +194,7 @@ namespace CommanderX16
                     id = entry.Id;
                 });
                 extracted = null;
-                kitStatus.Text = "Installed " + Path.GetFileNameWithoutExtension(path) + " and added it to Start.";
+                kitStatus.Text = "Installed " + Path.GetFileNameWithoutExtension(path) + " and added it to Favorites.";
                 return id;
             }
             catch (DownloadForbiddenException error)
@@ -205,7 +205,7 @@ namespace CommanderX16
             catch (Exception error)
             {
                 kitStatus.Text = "Installation failed.";
-                LauncherDialogs.Message(this, error.Message, "Add to Start");
+                LauncherDialogs.Message(this, error.Message, "Add to Favorites");
                 return null;
             }
             finally

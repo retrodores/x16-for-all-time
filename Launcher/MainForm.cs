@@ -16,7 +16,7 @@ namespace CommanderX16
         private readonly TabPage emulatorPage = new TabPage("Emulators") { Padding = new Padding(12) };
         private readonly Label emulatorRequired = new Label
         {
-            Text = "First, install or register an emulator to unlock Start, X16 Files, and SD Card Kit.",
+            Text = "First, install or register an emulator to unlock Favorites, X16 Files, and SD Card Kit.",
             AutoSize = true, ForeColor = Navy, Margin = new Padding(0, 0, 0, 12)
         };
         private readonly ComboBox emulators = Combo(), profiles = ProfileCombo();
@@ -67,7 +67,7 @@ namespace CommanderX16
             about.Anchor = AnchorStyles.Right;
             header.Controls.Add(about, 1, 0);
             AddRow(layout, header);
-            var start = new TabPage("Start") { Padding = new Padding(12) };
+            var start = new TabPage("Favorites") { Padding = new Padding(12) };
             var catalogPage = new TabPage("X16 Files") { Padding = new Padding(12) };
             var kitPage = new TabPage("SD Card Kit") { Padding = new Padding(12) };
             pages.TabPages.AddRange(new[] { start, catalogPage, kitPage, emulatorPage });
@@ -304,11 +304,11 @@ namespace CommanderX16
                 string names = string.Join(Environment.NewLine, affected.Take(10).Select(program => "• " + program.Name));
                 if (affected.Length > 10)
                     names += Environment.NewLine + "…and " + (affected.Length - 10) + " more.";
-                message += Environment.NewLine + Environment.NewLine + "These entries will use the Start fallback when available:" +
+                message += Environment.NewLine + Environment.NewLine + "These entries will use the Favorites fallback when available:" +
                     Environment.NewLine + names;
             }
             if (store.Data.StartEmulatorId == emulator.Id)
-                message += Environment.NewLine + Environment.NewLine + "Start will use the first available emulator unless you choose new Start defaults.";
+                message += Environment.NewLine + Environment.NewLine + "Favorites will use the first available emulator unless you choose new Favorites defaults.";
             string folder = EmulatorFolders.Root(emulator);
             bool filesDeleted = false;
             using (var dialog = new Form

@@ -16,7 +16,7 @@ namespace CommanderX16
         private readonly string profileId;
         private readonly Emulator initialEmulator;
         private readonly TextBox name = Entry(), prgPath = Entry();
-        private readonly CheckBox startDefaults = new CheckBox { Text = "Use Start defaults", AutoSize = true };
+        private readonly CheckBox startDefaults = new CheckBox { Text = "Use Favorites defaults", AutoSize = true };
         private readonly TableLayoutPanel launchFields = Table();
         private readonly Profile savedOptions;
         private readonly bool editingStartDefaults;
@@ -190,8 +190,8 @@ namespace CommanderX16
         }
 
         private bool HasSavedSettings => savedOptions != null && Emulator?.Id == initialEmulator?.Id;
-        private string SavedSettingsLabel => runOncePath != null ? (recalledRunOnce ? "Last Run once settings" : "Start launch settings") :
-            editingStartDefaults ? "Saved Start settings" : "Saved settings";
+        private string SavedSettingsLabel => runOncePath != null ? (recalledRunOnce ? "Last Run once settings" : "Favorites launch settings") :
+            editingStartDefaults ? "Saved Favorites settings" : "Saved settings";
         private string BuiltInSettingsLabel => editingStartDefaults ? "Built-in emulator defaults" : "Emulator defaults";
 
         private void RefreshProfiles(bool preferDefault = false)
@@ -429,7 +429,7 @@ namespace CommanderX16
                     var launchOptions = options;
                     var emulator = UseStartDefaults ? settings.ResolveLaunch(null, out launchOptions) : Emulator;
                     preview.Text = emulator == null
-                        ? (UseStartDefaults ? "Set an emulator in Start defaults before launching." :
+                        ? (UseStartDefaults ? "Set an emulator in Favorites defaults before launching." :
                             "Settings can be saved. Choose an emulator before launching.")
                         : CommandPreview(Launch.Prepare(emulator, launchOptions, ProgramPath, false,
                             Same(program.Path, ProgramPath) ? program.SdKitRoot : null));
@@ -452,7 +452,7 @@ namespace CommanderX16
             if (!confirm.Enabled) return;
             if (program != null && settings.HasProgramName(EntryName, program.Id))
             {
-                LauncherDialogs.Message(this, "This name is already in Start. Add a version or another distinguishing detail.", Text);
+                LauncherDialogs.Message(this, "This name is already in Favorites. Add a version or another distinguishing detail.", Text);
                 name.Focus();
                 name.SelectAll();
                 return;

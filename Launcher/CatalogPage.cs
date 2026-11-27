@@ -17,7 +17,7 @@ namespace CommanderX16
         private readonly TextBox catalogDetails = BrowserDetails();
         private readonly Button refreshCatalog = Button("Refresh from X16 Files");
         private readonly Button openProject = Button("Open project page");
-        private readonly Button installProgram = Button("Install to Start");
+        private readonly Button installProgram = Button("Install to Favorites");
         private const string RunDownloadLabel = "Download and run once";
         private readonly Button downloadProgram = Button(RunDownloadLabel);
         private readonly Label catalogStatus = BrowserStatus();
@@ -79,7 +79,7 @@ namespace CommanderX16
             var added = store.Data.Programs.FirstOrDefault(entry => entry.Id == id);
             launchStatus.Text = added?.PreviousInstall != null && source == "X16 Files"
                 ? "Reinstalled. See the program menu for the previous copy."
-                : "Added to Start from " + source;
+                : "Added to Favorites from " + source;
         }
 
         private void BuildCatalogPage(TabPage page, TabControl tabs, TabPage start)
@@ -115,7 +115,7 @@ namespace CommanderX16
             {
                 if (args.Button != MouseButtons.Left || !(args.Node.Tag is CatalogProgram)) return;
                 catalogTree.SelectedNode = args.Node;
-                installProgram.PerformClick();
+                downloadProgram.PerformClick();
             };
             openProject.Click += (sender, args) => Attempt(() =>
             {
@@ -205,7 +205,7 @@ namespace CommanderX16
             installProgram.Enabled = downloadProgram.Enabled;
             installProgram.Visible = downloadProgram.Visible = (program?.Downloads.Length ?? 0) > 0;
             installProgram.Text = program != null && store.Data.Programs.Any(entry => entry.CatalogId == program.Id)
-                ? "Reinstall to Start" : "Install to Start";
+                ? "Reinstall to Favorites" : "Install to Favorites";
             if (program == null)
             {
                 if (catalogPrograms != null)
@@ -283,7 +283,7 @@ namespace CommanderX16
                     };
                     id = entry.Id;
                 });
-                catalogStatus.Text = "Installed " + program + " and added it to Start.";
+                catalogStatus.Text = "Installed " + program + " and added it to Favorites.";
                 return id;
             }
             catch (DownloadForbiddenException error)
@@ -294,7 +294,7 @@ namespace CommanderX16
             catch (Exception error)
             {
                 catalogStatus.Text = "Installation failed";
-                LauncherDialogs.Message(this, error.Message, "Install to Start");
+                LauncherDialogs.Message(this, error.Message, "Install to Favorites");
                 return null;
             }
             finally { SetCatalogBusy(false); }

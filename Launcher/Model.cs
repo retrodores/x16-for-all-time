@@ -555,7 +555,7 @@ namespace CommanderX16
             copy.EnsureDefaultProfiles();
             if (copy.Programs.Any(entry => string.IsNullOrWhiteSpace(entry.Name)) ||
                 copy.Programs.Select(entry => entry.Name.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count() != copy.Programs.Count)
-                throw new InvalidOperationException("Give each Start program a distinct name.");
+                throw new InvalidOperationException("Give each Favorites program a distinct name.");
             string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {

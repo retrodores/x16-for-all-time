@@ -16,7 +16,7 @@ namespace CommanderX16
         private readonly ListBox startMenu = new ListBox
         {
             Dock = DockStyle.Fill, IntegralHeight = false, SelectionMode = SelectionMode.MultiExtended,
-            AccessibleName = "Start programs"
+            AccessibleName = "Favorites programs"
         };
         private bool updatingStartSelection;
         private Rectangle startDragArea;
@@ -37,7 +37,7 @@ namespace CommanderX16
         private readonly TextBox gifFile = Entry();
         private string gifEntryId;
         private readonly Button browseGif = Button("Browse…");
-        private readonly Button startDefaults = Button("Start defaults…");
+        private readonly Button startDefaults = Button("Favorites defaults…");
         private readonly Button runLocal = Button("Run once…");
         private readonly Label launchConfiguration = new Label { AutoSize = true };
         private readonly Button duplicate = Button("Duplicate entry…"),
@@ -55,7 +55,7 @@ namespace CommanderX16
             };
             AddRow(startBody, headline);
             AddRow(startBody, Pair("Find a program", search));
-            search.AccessibleName = "Find a Start program";
+            search.AccessibleName = "Find a Favorites program";
             preview.AccessibleName = "Emulator command preview";
             var toolbar = Table();
             toolbar.ColumnCount = 2;
@@ -131,7 +131,7 @@ namespace CommanderX16
                 Attempt(() => MoveStartProgramToEdge(true)));
             var moveBottom = new ToolStripMenuItem("Send to bottom", null, (sender, args) =>
                 Attempt(() => MoveStartProgramToEdge(false)));
-            var unlink = new ToolStripMenuItem("Remove from Start", null, (sender, args) => Attempt(RemoveStartEntries));
+            var unlink = new ToolStripMenuItem("Remove from Favorites", null, (sender, args) => Attempt(RemoveStartEntries));
             var delete = new ToolStripMenuItem("Delete programs from disk…", null, (sender, args) => removeProgram.PerformClick());
             var items = actions.Select(button =>
                 new ToolStripMenuItem(button == editProgram ? "Edit" : button.Text, null,
@@ -329,7 +329,7 @@ namespace CommanderX16
             var ids = new HashSet<string>(startMenu.SelectedItems.Cast<ProgramEntry>().Select(entry => entry.Id));
             store.Save(data => data.Programs.RemoveAll(entry => ids.Contains(entry.Id)));
             RefreshPrograms();
-            launchStatus.Text = "Removed from Start";
+            launchStatus.Text = "Removed from Favorites";
         }
 
         private void ShowProgramInformation()
@@ -375,7 +375,7 @@ namespace CommanderX16
             var paths = new HashSet<string>(selected.Select(entry => Path.GetFullPath(entry.Path)),
                 StringComparer.OrdinalIgnoreCase);
             if (paths.Any(path => !Launch.IsProgramFile(path)))
-                throw new IOException("Only PRG and BAS program files can be deleted from Start.");
+                throw new IOException("Only PRG and BAS program files can be deleted from Favorites.");
             var shared = store.Data.Programs.Where(entry => !ids.Contains(entry.Id) &&
                 paths.Contains(Path.GetFullPath(entry.Path))).Select(entry => entry.Name).ToArray();
             if (shared.Length != 0)
@@ -383,7 +383,7 @@ namespace CommanderX16
                     + Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, shared));
 
             var files = paths.Count == 1 ? "1 program file" : paths.Count + " program files";
-            var entries = selected.Length == 1 ? "1 Start entry" : selected.Length + " Start entries";
+            var entries = selected.Length == 1 ? "1 Favorites entry" : selected.Length + " Favorites entries";
             var summary = $"Permanently delete {files} and remove {entries}? Companion files stay on disk.";
             if (!LauncherDialogs.ConfirmProgramDeletion(this, summary, paths.OrderBy(path => path).ToArray())) return;
 
@@ -488,9 +488,9 @@ namespace CommanderX16
         {
             var selected = store.Data.ResolveLaunch(null, out _);
             var configured = store.Data.ConfiguredLaunchEmulator();
-            using (var dialog = new LaunchSettingsForm(store.Data, "Start defaults", selected,
+            using (var dialog = new LaunchSettingsForm(store.Data, "Favorites defaults", selected,
                 configured == null ? null : store.Data.StartOptions,
-                clearAction: store.Data.StartEmulatorId == null ? null : "Clear Start defaults"))
+                clearAction: store.Data.StartEmulatorId == null ? null : "Clear Favorites defaults"))
             {
                 var result = LauncherDialogs.Show(dialog, this);
                 if (result != DialogResult.OK && result != DialogResult.Abort) return;
@@ -600,7 +600,7 @@ namespace CommanderX16
             gifFile.Enabled = browseGif.Enabled = saveGif.Enabled && saveGif.Checked;
             startDefaults.Enabled = runLocal.Enabled = !launching && store.Data.Emulators.Count != 0;
             launchConfiguration.Text = emulator == null ? "Command preview" :
-                (program.EmulatorId == emulator.Id ? "PRG settings" : "Start defaults") + " · " + emulator.Name;
+                (program.EmulatorId == emulator.Id ? "PRG settings" : "Favorites defaults") + " · " + emulator.Name;
             editProgram.Enabled = duplicate.Enabled = !launching && program != null;
             removeProgram.Enabled = !launching && startMenu.SelectedItems.Count > 0;
             copy.Enabled = false;
