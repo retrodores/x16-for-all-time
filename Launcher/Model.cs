@@ -607,7 +607,8 @@ namespace CommanderX16
         internal static bool IsProgramFile(string path) =>
             IsBasicProgram(path) || string.Equals(Path.GetExtension(path), ".prg", StringComparison.OrdinalIgnoreCase);
 
-        public static Request Prepare(Emulator emulator, Profile profile, string program, bool validate, string kitRoot = null)
+        public static Request Prepare(Emulator emulator, Profile profile, string program, bool validate, string kitRoot = null,
+            string gifDirectory = null)
         {
             if (emulator == null || string.IsNullOrWhiteSpace(program))
                 throw new InvalidOperationException("Choose an emulator and a program file.");
@@ -643,7 +644,7 @@ namespace CommanderX16
             var args = new List<string> { basic ? "-bas" : "-prg", prg };
             if (profile.AutoRun)
                 args.Add("-run");
-            string options = OptionArguments(emulator, profile, directory, validate);
+            string options = OptionArguments(emulator, profile, gifDirectory ?? directory, validate);
             string arguments = string.Join(" ", args.Select(Quote));
             if (options.Length != 0) arguments += " " + options;
             return new Request { Action = "Launch", Exe = exe, Arguments = arguments, WorkingDirectory = directory };

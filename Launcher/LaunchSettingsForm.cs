@@ -21,6 +21,7 @@ namespace CommanderX16
         private readonly Profile savedOptions;
         private readonly bool editingStartDefaults;
         private readonly string runOncePath;
+        private readonly string gifDirectory;
         private readonly bool recalledRunOnce;
         private readonly ComboBox builds = Combo(), profiles = ProfileCombo();
         private readonly ComboBox cpu = OptionsFor(HardwareOptions.Cpu, HardwareOptions.CpuName);
@@ -55,7 +56,7 @@ namespace CommanderX16
 
         public LaunchSettingsForm(Settings settings, string title, Emulator selected, Profile savedOptions,
             ProgramEntry program = null, string profileName = null, string profileId = null, string clearAction = null,
-            string runOncePath = null, bool recalledRunOnce = false)
+            string runOncePath = null, bool recalledRunOnce = false, string gifDirectory = null)
         {
             this.settings = settings;
             this.program = program;
@@ -63,6 +64,7 @@ namespace CommanderX16
             initialEmulator = selected;
             bool fixedBuild = profileName != null;
             this.runOncePath = runOncePath;
+            this.gifDirectory = gifDirectory;
             this.recalledRunOnce = recalledRunOnce;
             editingStartDefaults = program == null && !fixedBuild && runOncePath == null;
             this.savedOptions = savedOptions;
@@ -372,7 +374,7 @@ namespace CommanderX16
             using (var dialog = new SaveFileDialog
             {
                 Filter = "GIF recording (*.gif)|*.gif", DefaultExt = "gif",
-                InitialDirectory = Path.GetDirectoryName(runOncePath ?? program?.Path) ?? "",
+                InitialDirectory = gifDirectory ?? Path.GetDirectoryName(runOncePath ?? program?.Path) ?? "",
                 OverwritePrompt = false
             })
                 if (dialog.ShowDialog(this) == DialogResult.OK) gif.Text = dialog.FileName;
@@ -409,7 +411,7 @@ namespace CommanderX16
             {
                 ReadOptions();
                 if (runOncePath != null)
-                    preview.Text = CommandPreview(Launch.Prepare(Emulator, options, runOncePath, false));
+                    preview.Text = CommandPreview(Launch.Prepare(Emulator, options, runOncePath, false, gifDirectory: gifDirectory));
                 else if (program != null)
                 {
                     if (string.IsNullOrWhiteSpace(prgPath.Text) ||

@@ -677,6 +677,7 @@ namespace CommanderX16
         {
             if (launching) return;
             string extraction = null;
+            string gifDirectory = null;
             Request request = null;
             try
             {
@@ -690,6 +691,7 @@ namespace CommanderX16
                 launchActivity.Show();
                 if (string.Equals(Path.GetExtension(path), ".zip", StringComparison.OrdinalIgnoreCase))
                 {
+                    gifDirectory = Path.GetDirectoryName(Path.GetFullPath(path));
                     launchStatus.Text = "Extracting ZIP…";
                     var directory = extraction = Path.Combine(Path.GetTempPath(), "X16ForAllTime-" + Guid.NewGuid().ToString("N"));
                     string[] candidates = await Task.Run(() => Catalog.ExtractCandidates(path, directory, null, includeBasic: true));
@@ -705,7 +707,7 @@ namespace CommanderX16
 
                 Profile runOptions;
                 using (var dialog = new LaunchSettingsForm(store.Data, "Run once", emulator, source,
-                    runOncePath: path, recalledRunOnce: recalled))
+                    runOncePath: path, recalledRunOnce: recalled, gifDirectory: gifDirectory))
                 {
                     if (LauncherDialogs.Show(dialog, this) != DialogResult.OK)
                     {
@@ -714,7 +716,7 @@ namespace CommanderX16
                     }
                     emulator = dialog.Emulator;
                     runOptions = Profile.Snapshot(dialog.Options, emulator);
-                    request = Launch.Prepare(emulator, runOptions, path, true);
+                    request = Launch.Prepare(emulator, runOptions, path, true, gifDirectory: gifDirectory);
                 }
                 launchStatus.Text = "Starting emulator…";
                 string launchedDirectory = extraction;
