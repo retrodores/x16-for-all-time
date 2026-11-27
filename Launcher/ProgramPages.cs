@@ -38,7 +38,7 @@ namespace CommanderX16
         private string gifEntryId;
         private readonly Button browseGif = Button("Browse…");
         private readonly Button startDefaults = Button("Start defaults…");
-        private readonly Button runLocal = Button("Run a local program…");
+        private readonly Button runLocal = Button("Run once…");
         private readonly Label launchConfiguration = new Label { AutoSize = true };
         private readonly Button duplicate = Button("Duplicate entry…"),
             removeProgram = Button("Delete files…");
@@ -684,8 +684,6 @@ namespace CommanderX16
             {
                 var emulator = store.Data.ResolveLaunch(null, out var source);
                 if (emulator == null) throw new InvalidOperationException(MissingLaunchSetup());
-                var options = Profile.CopyOptions(source, emulator);
-                options.AutoRun = true;
                 launching = true;
                 RefreshPreview();
                 launchActivity.Show();
@@ -704,7 +702,15 @@ namespace CommanderX16
                     path = Path.Combine(directory, candidates[selected]);
                 }
 
-                request = Launch.Prepare(emulator, options, path, true);
+                using (var dialog = new LaunchSettingsForm(store.Data, "Run once", emulator, source, runOncePath: path))
+                {
+                    if (LauncherDialogs.Show(dialog, this) != DialogResult.OK)
+                    {
+                        launchStatus.Text = "Launch canceled";
+                        return;
+                    }
+                    request = Launch.Prepare(dialog.Emulator, dialog.Options, path, true);
+                }
                 launchStatus.Text = "Starting emulator…";
                 string launchedDirectory = extraction;
                 Action cleanup = launchedDirectory == null ? (Action)null : () => Catalog.DiscardExtraction(launchedDirectory);
@@ -716,7 +722,7 @@ namespace CommanderX16
                 launchActivity.Hide();
                 launchStatus.Text = "Launch failed";
                 string details = error.Message + (request == null ? "" : Environment.NewLine + Environment.NewLine + CommandPreview(request));
-                LauncherDialogs.Message(this, details, "Run a local program");
+                LauncherDialogs.Message(this, details, "Run once");
             }
             finally
             {

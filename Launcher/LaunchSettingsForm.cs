@@ -20,6 +20,7 @@ namespace CommanderX16
         private readonly TableLayoutPanel launchFields = Table();
         private readonly Profile savedOptions;
         private readonly bool editingStartDefaults;
+        private readonly string runOncePath;
         private readonly ComboBox builds = Combo(), profiles = ProfileCombo();
         private readonly ComboBox cpu = OptionsFor(HardwareOptions.Cpu, HardwareOptions.CpuName);
         private readonly ComboBox mhz = OptionsFor(HardwareOptions.Clock,
@@ -52,14 +53,16 @@ namespace CommanderX16
         public string ProgramPath => Path.GetFullPath(prgPath.Text.Trim());
 
         public LaunchSettingsForm(Settings settings, string title, Emulator selected, Profile savedOptions,
-            ProgramEntry program = null, string profileName = null, string profileId = null, string clearAction = null)
+            ProgramEntry program = null, string profileName = null, string profileId = null, string clearAction = null,
+            string runOncePath = null)
         {
             this.settings = settings;
             this.program = program;
             this.profileId = profileId;
             initialEmulator = selected;
             bool fixedBuild = profileName != null;
-            editingStartDefaults = program == null && !fixedBuild;
+            this.runOncePath = runOncePath;
+            editingStartDefaults = program == null && !fixedBuild && runOncePath == null;
             this.savedOptions = savedOptions;
             preserveUnassignedOptions = program != null && selected == null && savedOptions != null;
             Text = title;
@@ -86,6 +89,8 @@ namespace CommanderX16
                 Disposed += (sender, args) => Catalog.DiscardExtraction(importedDirectory);
                 AddRow(body, Pair("Configuration", startDefaults));
             }
+            else if (runOncePath != null)
+                AddRow(body, Pair("Program file", new TextBox { Text = runOncePath, ReadOnly = true }));
             AddRow(launchFields, Pair("Emulator", builds));
             if (!fixedBuild)
                 AddRow(launchFields, Pair(editingStartDefaults ? "Load settings" : "Prefill from profile", profiles));
@@ -103,16 +108,17 @@ namespace CommanderX16
             AddRow(hardware, Pair("Host filesystem root", fs));
             AddRow(launchFields, hardware);
             AddRow(launchFields, Pair("ROM", rom, Button("Browse…", PickRom)));
-            AddRow(launchFields, Pair("Startup", autorun));
+            if (runOncePath == null)
+                AddRow(launchFields, Pair("Startup", autorun));
             AddRow(launchFields, serialCard);
             AddRow(launchFields, Pair("Extra arguments", extra));
             AddRow(body, launchFields);
-            AddRow(body, new Label { Text = program == null ? "Arguments preview" : "Command preview", AutoSize = true });
+            AddRow(body, new Label { Text = program == null && runOncePath == null ? "Arguments preview" : "Command preview", AutoSize = true });
             AddRow(body, preview, SizeType.Absolute, 84);
 
             var cancel = Button("Cancel");
             cancel.DialogResult = DialogResult.Cancel;
-            confirm = Button("Save", Confirm);
+            confirm = Button(runOncePath == null ? "Save" : "Run", Confirm);
             var actions = clearAction == null ? Flow(confirm, cancel)
                 : Flow(confirm, Button(clearAction, () => DialogResult = DialogResult.Abort), cancel);
             AddScrollableContent(this, body, actions);
@@ -128,9 +134,10 @@ namespace CommanderX16
             };
             launchFields.Enabled = !UseStartDefaults;
 
-            builds.Items.AddRange(settings.Emulators.Cast<object>().ToArray());
+            var available = settings.Emulators.Where(emulator => runOncePath == null || File.Exists(emulator.Exe)).ToArray();
+            builds.Items.AddRange(available);
             builds.Enabled = !fixedBuild;
-            int index = settings.Emulators.FindIndex(emulator => emulator.Id == selected?.Id);
+            int index = Array.FindIndex(available, emulator => emulator.Id == selected?.Id);
             if (index >= 0) builds.SelectedIndex = index;
             builds.SelectedIndexChanged += (sender, args) => LoadBuild();
             profiles.SelectedIndexChanged += (sender, args) =>
@@ -160,7 +167,7 @@ namespace CommanderX16
 
         private void LoadBuild()
         {
-            RefreshProfiles(preferDefault: !(editingStartDefaults && HasSavedSettings));
+            RefreshProfiles(preferDefault: !((editingStartDefaults || runOncePath != null) && HasSavedSettings));
             if (preserveUnassignedOptions && Emulator != null)
             {
                 preserveUnassignedOptions = false;
@@ -171,7 +178,8 @@ namespace CommanderX16
         }
 
         private bool HasSavedSettings => savedOptions != null && Emulator?.Id == initialEmulator?.Id;
-        private string SavedSettingsLabel => editingStartDefaults ? "Saved Start settings" : "Saved settings";
+        private string SavedSettingsLabel => runOncePath != null ? "Start launch settings" :
+            editingStartDefaults ? "Saved Start settings" : "Saved settings";
         private string BuiltInSettingsLabel => editingStartDefaults ? "Built-in emulator defaults" : "Emulator defaults";
 
         private void RefreshProfiles(bool preferDefault = false)
@@ -208,7 +216,7 @@ namespace CommanderX16
                     arguments = Launch.RemoveSerialCardOption(arguments, out var suppliedAddress);
                     address = suppliedAddress ?? address;
                 }
-                return (snapshot.Cpu, snapshot.Mhz, snapshot.Ram, snapshot.Scale, snapshot.AutoRun, snapshot.Fullscreen,
+                return (snapshot.Cpu, snapshot.Mhz, snapshot.Ram, snapshot.Scale, runOncePath != null || snapshot.AutoRun, snapshot.Fullscreen,
                     snapshot.Gif?.Trim() ?? "", snapshot.Rom.Trim(), snapshot.SdCard?.Trim() ?? "",
                     snapshot.FsRoot?.Trim() ?? "", arguments, serial, address);
             }).ToArray();
@@ -375,7 +383,7 @@ namespace CommanderX16
             options.Ram = advanced.Checked && advancedRam.Text.Trim().Length != 0
                 ? advancedRam.Text.Trim() : Value(ram);
             options.Scale = Value(scale);
-            options.AutoRun = autorun.Checked;
+            options.AutoRun = runOncePath != null || autorun.Checked;
             options.Fullscreen = fullscreen.Checked;
             options.Gif = gif.Text.Trim();
             options.Extra = extra.Text.Trim();
@@ -397,7 +405,9 @@ namespace CommanderX16
             try
             {
                 ReadOptions();
-                if (program != null)
+                if (runOncePath != null)
+                    preview.Text = CommandPreview(Launch.Prepare(Emulator, options, runOncePath, false));
+                else if (program != null)
                 {
                     if (string.IsNullOrWhiteSpace(prgPath.Text) ||
                         !Launch.IsProgramFile(ProgramPath))
