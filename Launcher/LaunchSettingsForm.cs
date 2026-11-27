@@ -39,8 +39,8 @@ namespace CommanderX16
             Text = "Enable serial card (-serialcard)", AutoSize = true
         };
         private readonly CheckBox autorun = new CheckBox { Text = "Run after loading", AutoSize = true };
-        private readonly TableLayoutPanel hardware = Table(), advancedFields = Table();
-        private readonly TextBox preview = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
+        private readonly TableLayoutPanel hardware = Table(), hardwareOutput = Table(), advancedFields = Table();
+        private readonly TextBox preview = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, WordWrap = false, ScrollBars = ScrollBars.Horizontal };
         private readonly Button confirm;
         private Profile options;
         private bool loading;
@@ -73,12 +73,14 @@ namespace CommanderX16
             Font = new Font("Segoe UI", 10);
             AutoScaleMode = AutoScaleMode.Dpi;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(720, 650);
-            MinimumSize = new Size(630, 550);
+            ClientSize = new Size(980, 570);
             MaximizeBox = false;
             MinimizeBox = false;
 
             var body = Table();
+            var columns = Table();
+            var tables = new[] { body, launchFields, columns, hardware, hardwareOutput, advancedFields };
+            foreach (var table in tables) table.SuspendLayout();
             body.Padding = new Padding(12);
             if (program != null || fixedBuild)
             {
@@ -105,27 +107,32 @@ namespace CommanderX16
             AddRow(advancedFields, Pair("Clock override (MHz)", advancedClock));
             AddRow(advancedFields, Pair("RAM override (KiB)", advancedRam));
             AddRow(hardware, advancedFields);
-            AddRow(hardware, Pair("Display scale", scale));
-            AddRow(hardware, Pair("Display", fullscreen));
-            AddRow(hardware, Pair("GIF output", gif, Button("Browse…", PickGif)));
-            AddRow(hardware, Pair("SD card image", sd));
-            AddRow(hardware, Pair("Host filesystem root", fs));
-            AddRow(launchFields, hardware);
+            AddRow(hardwareOutput, Pair("Display scale", scale));
+            AddRow(hardwareOutput, Pair("Display", fullscreen));
+            AddRow(hardwareOutput, Pair("GIF output", gif, Button("Browse…", PickGif)));
+            AddRow(hardwareOutput, Pair("SD card image", sd));
+            AddRow(hardwareOutput, Pair("Host filesystem root", fs));
+            columns.ColumnCount = 2;
+            columns.RowCount = 1;
+            columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48));
+            columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52));
+            hardwareOutput.Margin = new Padding(12, 0, 0, 0);
+            columns.Controls.Add(hardware, 0, 0);
+            columns.Controls.Add(hardwareOutput, 1, 0);
+            AddRow(launchFields, columns);
             AddRow(launchFields, Pair("ROM", rom, Button("Browse…", PickRom)));
-            if (runOncePath == null)
-                AddRow(launchFields, Pair("Startup", autorun));
-            AddRow(launchFields, serialCard);
+            AddRow(launchFields, runOncePath == null ? (Control)Flow(autorun, serialCard) : serialCard);
             AddRow(launchFields, Pair("Extra arguments", extra));
             AddRow(body, launchFields);
             AddRow(body, new Label { Text = program == null && runOncePath == null ? "Arguments preview" : "Command preview", AutoSize = true });
-            AddRow(body, preview, SizeType.Absolute, 84);
+            AddRow(body, preview, SizeType.Absolute, 54);
 
             var cancel = Button("Cancel");
             cancel.DialogResult = DialogResult.Cancel;
             confirm = Button(runOncePath == null ? "Save" : "Run", Confirm);
             var actions = clearAction == null ? Flow(confirm, cancel)
                 : Flow(confirm, Button(clearAction, () => DialogResult = DialogResult.Abort), cancel);
-            AddScrollableContent(this, body, actions);
+            AddConfigurationContent(this, body, actions);
             AcceptButton = confirm;
             CancelButton = cancel;
 
@@ -167,6 +174,7 @@ namespace CommanderX16
             }
             else
                 LoadBuild();
+            foreach (var table in tables.Reverse()) table.ResumeLayout(false);
         }
 
         private void LoadBuild()
@@ -238,7 +246,7 @@ namespace CommanderX16
             }
             profiles.SelectedIndex = preferDefault ? Array.FindIndex(groups, group => group.Contains(defaultChoice)) : 0;
             profiles.Enabled = emulator != null;
-            hardware.Enabled = emulator?.UpstreamOptions ?? (program != null);
+            hardware.Enabled = hardwareOutput.Enabled = emulator?.UpstreamOptions ?? (program != null);
             loading = false;
         }
 

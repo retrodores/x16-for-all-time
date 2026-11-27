@@ -22,8 +22,7 @@ namespace CommanderX16
             Font = new Font("Segoe UI", 10);
             AutoScaleMode = AutoScaleMode.Dpi;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(735, 205);
-            MinimumSize = new Size(650, 240);
+            ClientSize = new Size(900, 400);
             MaximizeBox = false;
             MinimizeBox = false;
             var body = Table();
@@ -37,7 +36,7 @@ namespace CommanderX16
             var confirm = Button(emulator == null ? "Register" : "Save", Confirm);
             var cancel = Button("Cancel");
             cancel.DialogResult = DialogResult.Cancel;
-            AddScrollableContent(this, body, Flow(confirm, cancel));
+            AddConfigurationContent(this, body, Flow(confirm, cancel));
             AcceptButton = confirm;
             CancelButton = cancel;
         }

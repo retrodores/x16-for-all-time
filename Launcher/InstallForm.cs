@@ -38,8 +38,7 @@ namespace CommanderX16
             Text = "Install or update X16Emu";
             Font = new Font("Segoe UI", 10);
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(730, 450);
-            MinimumSize = new Size(645, 385);
+            ClientSize = new Size(900, 400);
             StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = false;
             MaximizeBox = false;
@@ -65,7 +64,7 @@ namespace CommanderX16
             var close = Button("Close", Close);
             refresh.EnabledChanged += (sender, args) => close.Enabled = refresh.Enabled;
             close.DialogResult = DialogResult.Cancel;
-            AddScrollableContent(this, body, Flow(install, close));
+            AddConfigurationContent(this, body, Flow(install, close));
             AcceptButton = install;
             CancelButton = close;
 

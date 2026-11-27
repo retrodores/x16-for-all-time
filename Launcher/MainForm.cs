@@ -20,7 +20,7 @@ namespace CommanderX16
             AutoSize = true, ForeColor = Navy, Margin = new Padding(0, 0, 0, 12)
         };
         private readonly ComboBox emulators = Combo(), profiles = ProfileCombo();
-        private readonly TextBox preview = new TextBox { Multiline = true, ReadOnly = true, Dock = DockStyle.Fill, ScrollBars = ScrollBars.Vertical };
+        private readonly TextBox preview = new TextBox { Multiline = true, ReadOnly = true, Dock = DockStyle.Fill, WordWrap = false, ScrollBars = ScrollBars.Horizontal };
         private readonly Button run = Button("Run"), copy = Button("Copy PowerShell");
         private readonly Label launchStatus = new Label { AutoSize = true, ForeColor = Navy };
         private readonly Label status = new Label { AutoSize = true, ForeColor = Navy };
@@ -90,7 +90,7 @@ namespace CommanderX16
             BuildKitPage(kitPage, pages, start);
 
             var emulatorBody = Table();
-            AddScrollableContent(emulatorPage, emulatorBody);
+            emulatorPage.Controls.Add(emulatorBody);
             AddRow(emulatorBody, emulatorRequired);
             WrapText(emulatorRequired, emulatorBody);
             var selections = Table();
@@ -511,6 +511,48 @@ namespace CommanderX16
             int row = table.RowCount++;
             table.RowStyles.Add(new RowStyle(type, height));
             table.Controls.Add(child, 0, row);
+        }
+
+        internal static void AddConfigurationContent(Form host, TableLayoutPanel body, FlowLayoutPanel footer)
+        {
+            var layout = Table();
+            layout.AutoSize = false;
+            layout.Dock = DockStyle.Fill;
+            footer.Padding = new Padding(12, 4, 12, 8);
+            AddRow(layout, body);
+            AddRow(layout, footer);
+            host.Controls.Add(layout);
+
+            void FitContent()
+            {
+                if (!host.IsHandleCreated) return;
+                var area = Screen.FromControl(host).WorkingArea;
+                int frameWidth = host.Width - host.ClientSize.Width;
+                int frameHeight = host.Height - host.ClientSize.Height;
+                int width = Math.Min(host.ClientSize.Width, area.Width - frameWidth);
+                int height = Math.Min(footer.Bottom + frameHeight, area.Height);
+                if (height <= frameHeight || width <= 0) return;
+                var minimum = new Size(Math.Min(700, area.Width), height);
+                if (host.MinimumSize != minimum) host.MinimumSize = minimum;
+                if (host.ClientSize.Width != width) host.ClientSize = new Size(width, host.ClientSize.Height);
+                if (host.Bottom > area.Bottom && host.Visible) host.Top = Math.Max(area.Top, area.Bottom - host.Height);
+            }
+            bool fitPending = false;
+            layout.Layout += (sender, args) =>
+            {
+                if (!host.Visible || fitPending) return;
+                fitPending = true;
+                host.BeginInvoke(new Action(() =>
+                {
+                    FitContent();
+                    fitPending = false;
+                }));
+            };
+            host.Shown += (sender, args) =>
+            {
+                FitContent();
+                host.Height = host.MinimumSize.Height;
+            };
         }
 
         internal static void AddScrollableContent(Control host, TableLayoutPanel body, FlowLayoutPanel footer = null)
