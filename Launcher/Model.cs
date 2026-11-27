@@ -36,6 +36,8 @@ namespace CommanderX16
         [DataMember(EmitDefaultValue = false)] public string RunOnceEmulatorId;
         [DataMember(EmitDefaultValue = false)] public Profile RunOnceOptions;
 
+        [DataMember(EmitDefaultValue = false)] public List<RunHistoryEntry> History;
+
         public Emulator FindEmulator(string id) => id == null ? null : Emulators.FirstOrDefault(emulator => emulator.Id == id);
 
         public Profile DefaultProfile(Emulator emulator) => Profiles.FirstOrDefault(profile =>
@@ -394,6 +396,8 @@ namespace CommanderX16
         [DataMember] public string Author;
         [DataMember] public string Version;
         [DataMember] public string Url;
+        [DataMember(EmitDefaultValue = false)] public CatalogPackage Package;
+        [DataMember(EmitDefaultValue = false)] public string EntryPoint;
     }
 
     [DataContract]
@@ -742,6 +746,15 @@ namespace CommanderX16
                 extra = extra.Remove(flag.Index, operand.Index + operand.Length - flag.Index);
             }
             return extra.Trim();
+        }
+
+        internal static string OptionValue(string arguments, string option, string suffix = "")
+        {
+            var tokens = ArgumentTokens.Matches(arguments ?? "");
+            for (int index = 0; index + 1 < tokens.Count; index++)
+                if (IsOption(tokens[index], option))
+                    return tokens[index + 1].Value.Trim('"') + suffix;
+            return null;
         }
 
         internal static bool HasExtraOption(string extra, string option) =>

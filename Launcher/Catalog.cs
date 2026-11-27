@@ -35,7 +35,7 @@ namespace CommanderX16
             uri.Host.Length != 0 && uri.UserInfo.Length == 0;
 
         public static async Task<string> Download(CatalogProgram program, CatalogPackage package, IProgress<string> progress,
-            Func<string[], string> choosePrg)
+            Func<string[], string> choosePrg, Action<string> selectedEntry = null)
         {
             if (package?.Supported != true)
                 throw new IOException("This program has no supported package.");
@@ -65,6 +65,7 @@ namespace CommanderX16
 
                 var destination = Path.Combine(parent, instance);
                 Directory.Move(files, destination);
+                selectedEntry?.Invoke(relative.Replace('\\', '/'));
                 return Path.Combine(destination, relative);
             }
             finally

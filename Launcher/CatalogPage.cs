@@ -251,8 +251,9 @@ namespace CommanderX16
             SetCatalogBusy(true, "Preparing installation…");
             try
             {
+                string entryPoint = null;
                 var path = await Catalog.Download(program, package,
-                    new Progress<string>(message => catalogStatus.Text = message), SelectCatalogPrg);
+                    new Progress<string>(message => catalogStatus.Text = message), SelectCatalogPrg, value => entryPoint = value);
                 if (path == null)
                 {
                     catalogStatus.Text = "Download canceled";
@@ -279,7 +280,7 @@ namespace CommanderX16
                     entry.Source = new ProgramSource
                     {
                         Title = program.ToString(), Author = program.Author?.Name,
-                        Version = program.Version, Url = program.PageUrl
+                        Version = program.Version, Url = program.PageUrl, Package = package, EntryPoint = entryPoint
                     };
                     id = entry.Id;
                 });
@@ -314,18 +315,20 @@ namespace CommanderX16
             var program = catalogTree.SelectedNode?.Tag as CatalogProgram;
             if (catalogBusy || launching || (program?.Downloads.Length ?? 0) == 0) return;
             var installedId = store.Data.Programs.FirstOrDefault(entry => entry.CatalogId == program.Id)?.Id;
+            var origin = new RunHistoryEntry { Name = program.ToString(), Mode = "Run once", CatalogId = program.Id };
             await LaunchFromBrowser(async progress =>
             {
                 var package = SelectCatalogDownload(program);
                 if (package == null) return (null, null);
-                var path = await Catalog.Download(program, package, progress, SelectCatalogPrg);
+                origin.Package = package;
+                var path = await Catalog.Download(program, package, progress, SelectCatalogPrg, value => origin.EntryPoint = value);
                 return (path, null);
-            }, SetCatalogBusy, catalogStatus, installedId);
+            }, SetCatalogBusy, catalogStatus, installedId, origin);
         }
 
         private async Task LaunchFromBrowser(
             Func<IProgress<string>, Task<(string Path, string Root)>> getProgram,
-            Action<bool, string> setBusy, Label status, string installedId)
+            Action<bool, string> setBusy, Label status, string installedId, RunHistoryEntry origin)
         {
             var installed = store.Data.Programs.FirstOrDefault(entry => entry.Id == installedId);
             if (store.Data.ResolveLaunch(installed, out _) == null)
@@ -354,7 +357,12 @@ namespace CommanderX16
                     return;
                 }
                 status.Text = "Starting emulator…";
-                await StartPreparedProgram(request, message => status.Text = message);
+                origin.Path = program.Path;
+                origin.KitRoot = program.Root;
+                if (origin.KitPath != null && program.Root != null)
+                    origin.EntryPoint = RunHistoryEntry.RelativeEntry(program.Root, program.Path);
+                await StartPreparedProgram(request, message => status.Text = message,
+                    entry: origin.WithSettings(emulator, options));
                 RememberRunOnce(emulator, options, status);
             }
             catch (DownloadForbiddenException error)

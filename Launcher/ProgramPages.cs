@@ -568,16 +568,16 @@ namespace CommanderX16
             }
         }
 
-        private Request Prepare(ProgramEntry program, Emulator emulator, Profile options, bool validate)
+        private Profile FavoriteLaunchOptions(ProgramEntry program, Emulator emulator, Profile options)
         {
-            if (saveGif.Checked)
-            {
-                var output = program.Id == gifEntryId ? gifFile.Text : program.StartGifPath;
-                options = Launch.WithGifOverride(options, emulator,
-                    string.IsNullOrWhiteSpace(output) ? DefaultStartGifName(program) : output);
-            }
-            return Launch.Prepare(emulator, options, program.Path, validate, program.SdKitRoot);
+            if (!saveGif.Checked) return options;
+            var output = program.Id == gifEntryId ? gifFile.Text : program.StartGifPath;
+            return Launch.WithGifOverride(options, emulator,
+                string.IsNullOrWhiteSpace(output) ? DefaultStartGifName(program) : output);
         }
+
+        private Request Prepare(ProgramEntry program, Emulator emulator, Profile options, bool validate) =>
+            Launch.Prepare(emulator, FavoriteLaunchOptions(program, emulator, options), program.Path, validate, program.SdKitRoot);
 
         internal static string CommandPreview(Request request) =>
             Launch.Quote(request.Exe) + " " + request.Arguments + Environment.NewLine +
@@ -590,6 +590,7 @@ namespace CommanderX16
             var emulator = program == null ? null : store.Data.ResolveLaunch(program, out options);
             UpdateCatalogSelection();
             UpdateKitSelection();
+            replayHistory.Enabled = !launching && SelectedHistory != null;
             run.Enabled = false;
             browsePrograms.Visible = store.Data.Programs.Count == 0;
             int count = startMenu.SelectedItems.Count;
@@ -654,15 +655,25 @@ namespace CommanderX16
             {
                 var emulator = store.Data.ResolveLaunch(program, out var options);
                 if (emulator == null) throw new InvalidOperationException(MissingLaunchSetup());
-                request = Prepare(program, emulator, options, false);
-                Prepare(program, emulator, options, true);
+                options = FavoriteLaunchOptions(program, emulator, options);
+                request = Launch.Prepare(emulator, options, program.Path, false, program.SdKitRoot);
+                Launch.Prepare(emulator, options, program.Path, true, program.SdKitRoot);
                 launching = true;
                 RefreshPreview();
                 preview.Text = CommandPreview(request);
                 copy.Enabled = false;
                 launchStatus.Text = "Starting emulator…";
                 launchActivity.Show();
-                await StartPreparedProgram(request, message => launchStatus.Text = message);
+                var history = new RunHistoryEntry
+                {
+                    Name = program.Name, Mode = "Favorites", Path = program.Path,
+                    CatalogId = program.CatalogId, Package = program.Source?.Package, EntryPoint = program.Source?.EntryPoint,
+                    KitPath = program.SdKitSource, KitRoot = program.SdKitRoot, KitRevision = program.Source?.Version
+                };
+                if (history.KitRoot != null)
+                    history.EntryPoint = RunHistoryEntry.RelativeEntry(history.KitRoot, history.Path);
+                await StartPreparedProgram(request, message => launchStatus.Text = message,
+                    entry: history.WithSettings(emulator, options));
             }
             catch (Exception error)
             {
@@ -684,6 +695,7 @@ namespace CommanderX16
             if (launching) return;
             string extraction = null;
             string gifDirectory = null;
+            var history = new RunHistoryEntry { Mode = "Run once" };
             Request request = null;
             try
             {
@@ -692,7 +704,8 @@ namespace CommanderX16
                 launchActivity.Show();
                 if (string.Equals(Path.GetExtension(path), ".zip", StringComparison.OrdinalIgnoreCase))
                 {
-                    gifDirectory = Path.GetDirectoryName(Path.GetFullPath(path));
+                    history.LocalArchive = Path.GetFullPath(path);
+                    gifDirectory = Path.GetDirectoryName(history.LocalArchive);
                     launchStatus.Text = "Extracting ZIP…";
                     var directory = extraction = Path.Combine(Path.GetTempPath(), "X16ForAllTime-" + Guid.NewGuid().ToString("N"));
                     string[] candidates = await Task.Run(() => Catalog.ExtractCandidates(path, directory, null, includeBasic: true));
@@ -703,6 +716,7 @@ namespace CommanderX16
                         launchStatus.Text = "Launch canceled";
                         return;
                     }
+                    history.EntryPoint = candidates[selected].Replace('\\', '/');
                     path = Path.Combine(directory, candidates[selected]);
                 }
 
@@ -715,7 +729,10 @@ namespace CommanderX16
                 launchStatus.Text = "Starting emulator…";
                 string launchedDirectory = extraction;
                 Action cleanup = launchedDirectory == null ? (Action)null : () => Catalog.DiscardExtraction(launchedDirectory);
-                await StartPreparedProgram(request, message => launchStatus.Text = message, cleanup);
+                history.Name = Path.GetFileNameWithoutExtension(path);
+                history.Path = path;
+                await StartPreparedProgram(request, message => launchStatus.Text = message, cleanup,
+                    history.WithSettings(emulator, runOptions));
                 extraction = null; // The process monitor now owns the ZIP's temporary files.
                 RememberRunOnce(emulator, runOptions, launchStatus);
             }
@@ -771,7 +788,8 @@ namespace CommanderX16
             }
         }
 
-        private async Task StartPreparedProgram(Request request, Action<string> report, Action cleanup = null)
+        private async Task StartPreparedProgram(Request request, Action<string> report, Action cleanup = null,
+            RunHistoryEntry entry = null)
         {
             int attempt = ++launchAttempt;
             string lateError = null;
@@ -781,6 +799,7 @@ namespace CommanderX16
                 if (attempt == launchAttempt && !IsDisposed) report(message);
             }), cleanup);
             if (lateError == null) report("Emulator launched");
+            if (entry != null) RecordHistory(entry, request);
         }
     }
 }

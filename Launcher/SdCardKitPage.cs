@@ -52,7 +52,12 @@ namespace CommanderX16
                 var item = kitTree.SelectedNode?.Tag as KitItem;
                 if (loadingKit || launching || item?.CanInstall != true) return;
                 var installedId = store.Data.Programs.FirstOrDefault(entry => entry.SdKitSource == item.Path)?.Id;
-                await LaunchFromBrowser(progress => GetKitProgram(item), SetKitBusy, kitStatus, installedId);
+                var origin = new RunHistoryEntry
+                {
+                    Name = Path.GetFileNameWithoutExtension(item.Path), Mode = "Run once",
+                    KitPath = item.Path, KitRevision = kitRevision
+                };
+                await LaunchFromBrowser(progress => GetKitProgram(item, origin.KitRevision), SetKitBusy, kitStatus, installedId, origin);
             };
             kitTree.NodeMouseDoubleClick += (sender, args) =>
             {
@@ -215,18 +220,21 @@ namespace CommanderX16
             }
         }
 
-        private async Task<(string Path, string Root)> GetKitProgram(KitItem item)
+        private async Task<(string Path, string Root)> GetKitProgram(KitItem item, string revision = null,
+            string entryPoint = null, Label progress = null)
         {
-            var root = await EnsureKitSnapshot();
+            revision = revision ?? kitRevision;
+            progress = progress ?? kitStatus;
+            var root = await EnsureKitSnapshot(revision, progress);
             var path = Path.Combine(root, item.Path.Substring(KitRoot.Length + 1).Replace('/', Path.DirectorySeparatorChar));
-            if (!File.Exists(path)) await RestoreKitFile(item, path);
+            if (!File.Exists(path)) await RestoreKitFile(item, path, revision, progress);
             if (!item.IsZip) return (path, root);
 
-            kitStatus.Text = "Extracting program ZIP…";
+            progress.Text = "Extracting program ZIP…";
             var extracted = Path.Combine(SettingsStore.Home, "SdCardKit", "Packages", Guid.NewGuid().ToString("N"));
             try
             {
-                string[] choices = await Task.Run(() => Catalog.ExtractCandidates(path, extracted, null, includeBasic: true));
+                string[] choices = await Task.Run(() => Catalog.ExtractCandidates(path, extracted, entryPoint, includeBasic: true));
                 int selected = choices.Length == 1 ? 0 : LauncherDialogs.SelectItem(this, "Choose the startup program", choices);
                 if (selected < 0) return (null, null);
                 root = extracted;
@@ -239,9 +247,9 @@ namespace CommanderX16
             }
         }
 
-        private async Task RestoreKitFile(KitItem item, string path)
+        private async Task RestoreKitFile(KitItem item, string path, string revision, Label progress)
         {
-            kitStatus.Text = "Downloading the missing program file…";
+            progress.Text = "Downloading the missing program file…";
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
@@ -249,7 +257,7 @@ namespace CommanderX16
                 await PowerShell.Execute(new Request
                 {
                     Action = "Download",
-                    Url = "https://raw.githubusercontent.com/cx16forum/sdcard/" + kitRevision + "/" +
+                    Url = "https://raw.githubusercontent.com/cx16forum/sdcard/" + revision + "/" +
                         string.Join("/", item.Path.Split('/').Select(Uri.EscapeDataString)),
                     Destination = temporary
                 });
@@ -258,14 +266,13 @@ namespace CommanderX16
             finally { if (File.Exists(temporary)) File.Delete(temporary); }
         }
 
-        private async Task<string> EnsureKitSnapshot()
+        private async Task<string> EnsureKitSnapshot(string revision, Label progress)
         {
             var parent = Path.Combine(SettingsStore.Home, "SdCardKit");
-            var revision = kitRevision;
             var destination = Path.Combine(parent, revision);
             if (Directory.Exists(destination))
             {
-                kitStatus.Text = "Preparing program from the installed kit…";
+                progress.Text = "Preparing program from the installed kit…";
                 return destination;
             }
 
@@ -275,7 +282,7 @@ namespace CommanderX16
             Directory.CreateDirectory(stage);
             try
             {
-                kitStatus.Text = "Downloading the SD Card Kit for this revision…";
+                progress.Text = "Downloading the SD Card Kit for this revision…";
                 await PowerShell.Execute(new Request
                 {
                     Action = "SdCardArchive",
@@ -283,7 +290,7 @@ namespace CommanderX16
                     Destination = archive
                 });
 
-                kitStatus.Text = "Extracting the SD Card Kit…";
+                progress.Text = "Extracting the SD Card Kit…";
                 var extracted = await Task.Run(() => Catalog.ExtractArchive(archive, files, "sdcard-" + revision + "/" + KitRoot + "/"));
                 if (extracted.Count == 0)
                     throw new IOException("The archive does not contain the SD Card Kit.");

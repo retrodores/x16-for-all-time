@@ -70,7 +70,8 @@ namespace CommanderX16
             var start = new TabPage("Favorites") { Padding = new Padding(12) };
             var catalogPage = new TabPage("X16 Files") { Padding = new Padding(12) };
             var kitPage = new TabPage("SD Card Kit") { Padding = new Padding(12) };
-            pages.TabPages.AddRange(new[] { start, catalogPage, kitPage, emulatorPage });
+            var historyPage = new TabPage("History") { Padding = new Padding(12) };
+            pages.TabPages.AddRange(new[] { start, catalogPage, kitPage, historyPage, emulatorPage });
             pages.Selecting += (sender, args) => args.Cancel = args.TabPage?.Enabled == false;
             pages.DrawItem += (sender, args) =>
             {
@@ -88,6 +89,7 @@ namespace CommanderX16
             BuildStartPage(start, pages, catalogPage);
             BuildCatalogPage(catalogPage, pages, start);
             BuildKitPage(kitPage, pages, start);
+            BuildHistoryPage(historyPage);
 
             var emulatorBody = Table();
             emulatorPage.Controls.Add(emulatorBody);
@@ -154,7 +156,7 @@ namespace CommanderX16
             emulatorRequired.Visible = !hasEmulator;
             if (!hasEmulator) pages.SelectedTab = emulatorPage;
             foreach (TabPage page in pages.TabPages)
-                page.Enabled = hasEmulator || page == emulatorPage;
+                page.Enabled = hasEmulator || page == emulatorPage || page.Text == "History";
             pages.DrawMode = hasEmulator ? TabDrawMode.Normal : TabDrawMode.OwnerDrawFixed;
             pages.Invalidate();
         }
